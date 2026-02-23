@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#0a0a0f"/>
+
+  <!-- Spinning wheel outer ring -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#06b6d4" stroke-width="16"/>
+
+  <!-- Wheel spokes -->
+  <line x1="256" y1="76" x2="256" y2="436" stroke="#06b6d4" stroke-width="8" stroke-linecap="round" opacity="0.5"/>
+  <line x1="76" y1="256" x2="436" y2="256" stroke="#06b6d4" stroke-width="8" stroke-linecap="round" opacity="0.5"/>
+  <line x1="129" y1="129" x2="383" y2="383" stroke="#06b6d4" stroke-width="8" stroke-linecap="round" opacity="0.5"/>
+  <line x1="383" y1="129" x2="129" y2="383" stroke="#06b6d4" stroke-width="8" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- Center hub -->
+  <circle cx="256" cy="256" r="36" fill="#06b6d4"/>
+
+  <!-- "SB" text -->
+  <text
+    x="256"
+    y="275"
+    text-anchor="middle"
+    font-family="system-ui, -apple-system, sans-serif"
+    font-size="40"
+    font-weight="800"
+    fill="#0a0a0f"
+    letter-spacing="-2"
+  >SB</text>
+</svg>
