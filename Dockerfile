@@ -2,13 +2,17 @@
 # SpinBooking Web - Dockerfile para EasyPanel
 # ============================================
 # Next.js standalone; usa PORT desde entorno para compatibilidad con EasyPanel.
+#
+# Límite Docker Hub (429): configurar login en Easypanel o usar espejo vía build-arg:
+#   docker build --build-arg NODE_IMAGE=docker.m.daocloud.io/library/node:20-alpine ...
+ARG NODE_IMAGE=node:20-alpine
 
-FROM node:20-alpine AS deps
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 COPY package.json pnpm-lock.yaml* ./
 RUN corepack enable pnpm && pnpm install --frozen-lockfile
 
-FROM node:20-alpine AS builder
+FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -17,7 +21,7 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
-FROM node:20-alpine AS runner
+FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 
 # Usuario no-root (recomendado para EasyPanel/producción)
