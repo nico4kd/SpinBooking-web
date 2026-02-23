@@ -19,7 +19,7 @@ COPY . .
 
 # Build Next.js (output: standalone)
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN pnpm build
+RUN corepack enable pnpm && pnpm build
 
 FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
