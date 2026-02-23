@@ -8,7 +8,7 @@ ARG NODE_IMAGE=public.ecr.aws/docker/library/node:20-alpine
 
 FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
-COPY package.json pnpm-lock.yaml* ./
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
 COPY shared ./shared
 RUN corepack enable pnpm && pnpm install --no-frozen-lockfile
 
