@@ -1,52 +1,44 @@
-FROM node:20-alpine AS base
+# ============================================
+# SpinBooking Web - Dockerfile para EasyPanel
+# ============================================
+# Next.js standalone; usa PORT desde entorno para compatibilidad con EasyPanel.
 
-# Install turbo and pnpm globally
-RUN npm install -g turbo pnpm@8.15.1
-
-FROM base AS pruner
+FROM node:20-alpine AS deps
 WORKDIR /app
+COPY package.json pnpm-lock.yaml* ./
+RUN corepack enable pnpm && pnpm install --frozen-lockfile
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN turbo prune --scope=web --out-dir=out
 
-FROM base AS builder
+# Build Next.js (output: standalone)
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN pnpm build
+
+FROM node:20-alpine AS runner
 WORKDIR /app
 
-# Copy pruned lockfile and package.json
-COPY --from=pruner /app/out/json/ .
-COPY --from=pruner /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
-
-# Install dependencies
-RUN pnpm install --frozen-lockfile
-
-# Copy pruned source code
-COPY --from=pruner /app/out/full/ .
-COPY turbo.json .
-
-# Build the project
-RUN turbo run build --filter=web...
-
-FROM base AS runner
-WORKDIR /app
-
-# Don't run production as root
+# Usuario no-root (recomendado para EasyPanel/producción)
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nodejs
 USER nodejs
 
-# Copy standalone output from builder
-COPY --from=builder /app/apps/web/public ./apps/web/public
-COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+# Copiar salida standalone de Next.js (estructura en raíz del proyecto)
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 
-# Environment variables
 ENV NODE_ENV=production
-ENV PORT=3001
+# EasyPanel inyecta PORT; Next.js standalone lo usa por defecto
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-EXPOSE 3001
+EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3001', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+# Health check para que EasyPanel detecte cuando la app está lista
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://127.0.0.1:' + (process.env.PORT || 3000), (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"
 
-# Start application
-CMD ["node", "apps/web/server.js"]
+CMD ["node", "server.js"]
