@@ -14,8 +14,10 @@ RUN corepack enable pnpm && pnpm install --no-frozen-lockfile
 
 FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
+COPY --from=deps /app/shared ./shared
 
 # Build Next.js (output: standalone)
 ENV NEXT_TELEMETRY_DISABLED=1
