@@ -3,9 +3,8 @@
 # ============================================
 # Next.js standalone; usa PORT desde entorno para compatibilidad con EasyPanel.
 #
-# Límite Docker Hub (429): configurar login en Easypanel o usar espejo vía build-arg:
-#   docker build --build-arg NODE_IMAGE=docker.m.daocloud.io/library/node:20-alpine ...
-ARG NODE_IMAGE=node:20-alpine
+# Límite Docker Hub (429): se usa espejo de Amazon ECR Public para evitar fallos en pulls anónimos.
+ARG NODE_IMAGE=public.ecr.aws/docker/library/node:20-alpine
 
 FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
