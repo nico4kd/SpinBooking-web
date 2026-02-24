@@ -8,5 +8,3 @@ dist
 *.tsbuildinfo
 .git
 .dockerignore
-Dockerfile
-pnpm-lock.yaml*
