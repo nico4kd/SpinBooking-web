@@ -3,8 +3,8 @@ node_modules
 out
 build
 dist
-.env.local
-.env.*.local
+# .env.local
+# .env.*.local
 *.tsbuildinfo
 .git
 .dockerignore
