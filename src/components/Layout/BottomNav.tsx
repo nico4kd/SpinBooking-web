@@ -5,9 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   TrendingUp,
-  Calendar,
-  Package,
-  CreditCard,
   User,
 } from 'lucide-react';
 
@@ -19,9 +16,6 @@ interface NavItem {
 
 const navigationItems: NavItem[] = [
   { href: '/dashboard', icon: TrendingUp, label: 'Inicio' },
-  { href: '/classes', icon: Calendar, label: 'Clases' },
-  { href: '/packages', icon: Package, label: 'Paquetes' },
-  { href: '/bookings', icon: CreditCard, label: 'Reservas' },
   { href: '/profile', icon: User, label: 'Perfil' },
 ];
 
@@ -43,7 +37,7 @@ export function BottomNav() {
     <nav
       className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-[hsl(var(--surface-1))] border-t border-[hsl(var(--border-default))] safe-area-bottom"
     >
-      <div className="flex items-center justify-around">
+      <div className="flex items-center justify-center gap-16">
         {navigationItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);

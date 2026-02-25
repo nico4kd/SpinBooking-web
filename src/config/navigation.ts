@@ -1,7 +1,6 @@
 import {
   TrendingUp,
   Calendar,
-  Package,
   CheckCircle2,
   User,
   Users,
@@ -9,6 +8,7 @@ import {
   BarChart3,
   CreditCard,
   Settings,
+  SlidersHorizontal,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -25,26 +25,6 @@ export const memberNavigation: NavigationItem[] = [
     href: '/dashboard',
     icon: TrendingUp,
     label: 'Dashboard',
-  },
-  {
-    href: '/classes',
-    icon: Calendar,
-    label: 'Clases',
-  },
-  {
-    href: '/progress',
-    icon: BarChart3,
-    label: 'Mi Progreso',
-  },
-  {
-    href: '/packages',
-    icon: Package,
-    label: 'Mis Paquetes',
-  },
-  {
-    href: '/bookings',
-    icon: CheckCircle2,
-    label: 'Mis Reservas',
   },
   {
     href: '/profile',
@@ -93,6 +73,11 @@ export const adminNavigation: NavigationItem[] = [
     href: '/admin/reports',
     icon: BarChart3,
     label: 'Reportes',
+  },
+  {
+    href: '/admin/settings',
+    icon: SlidersHorizontal,
+    label: 'Configuración',
   },
 ];
 
