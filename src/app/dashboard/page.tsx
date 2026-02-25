@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../context/auth-context';
 import api from '../../lib/api-client';
 import {
@@ -11,6 +11,7 @@ import {
   Spinner,
 } from '../../components/ui';
 import { AppLayout, PageHeader } from '../../components/Layout';
+import { useNotifications } from '../../hooks/useNotifications';
 import { MonthDayPicker } from '../../components/calendar/MonthDayPicker';
 import BikeSelectionModal from '../../components/BikeSelectionModal';
 import { toast } from '../../lib/toast';
@@ -146,6 +147,15 @@ export default function DashboardPage() {
     loadMonthBookings(calendarMonth);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarMonth]);
+
+  // Reactive refresh: when a package is activated, reload stats and packages
+  useNotifications({
+    onNewPackageActivated: useCallback(() => {
+      loadStats();
+      loadPackages();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  });
 
   const loadStats = async () => {
     try {

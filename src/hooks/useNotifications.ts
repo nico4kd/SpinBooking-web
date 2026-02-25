@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../lib/api-client';
 
 export interface Notification {
@@ -16,24 +16,45 @@ interface NotificationsResponse {
   unreadCount: number;
 }
 
-export function useNotifications(pollingInterval = 30000) {
+interface UseNotificationsOptions {
+  pollingInterval?: number;
+  onNewPackageActivated?: () => void;
+}
+
+export function useNotifications(options: UseNotificationsOptions = {}) {
+  const { pollingInterval = 30000, onNewPackageActivated } = options;
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const prevTopIdRef = useRef<string | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     try {
       const response = await api.get<NotificationsResponse>('/notifications', {
         params: { limit: 20 },
       });
-      setNotifications(response.data.data);
+      const incoming = response.data.data;
+
+      if (prevTopIdRef.current !== null && incoming.length > 0) {
+        const prevIndex = incoming.findIndex((n) => n.id === prevTopIdRef.current);
+        const brandNewOnes = prevIndex === -1 ? incoming : incoming.slice(0, prevIndex);
+        if (brandNewOnes.some((n) => n.type === 'PACKAGE_ACTIVATED')) {
+          onNewPackageActivated?.();
+        }
+      }
+
+      if (incoming.length > 0) {
+        prevTopIdRef.current = incoming[0].id;
+      }
+
+      setNotifications(incoming);
       setUnreadCount(response.data.unreadCount);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onNewPackageActivated]);
 
   const markAsRead = useCallback(async (id: string) => {
     try {
