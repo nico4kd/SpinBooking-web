@@ -1,9 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Zap, LogOut, Menu, X } from 'lucide-react';
+import { Zap, LogOut } from 'lucide-react';
 import { useAuth } from '../../context/auth-context';
 import { Button, Badge } from '../ui';
 import { getNavigationForRole } from '../../config/navigation';
@@ -11,7 +10,6 @@ import { getNavigationForRole } from '../../config/navigation';
 export function Sidebar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
 
   if (!user) return null;
 
@@ -34,55 +32,17 @@ export function Sidebar() {
   };
 
   return (
-    <>
-      {/* Mobile Hamburger Button */}
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-4 right-4 z-50 w-10 h-10 flex items-center justify-center rounded-lg bg-[hsl(var(--surface-1))] border border-[hsl(var(--border-default))] hover:bg-[hsl(var(--surface-2))] transition-colors"
-        aria-label="Open menu"
-      >
-        <Menu className="w-5 h-5" />
-      </button>
-
-      {/* Mobile Overlay */}
-      {mobileOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={`
-          w-64 border-r border-[hsl(var(--border-default))] flex flex-col
-          bg-[hsl(var(--background))]
-          lg:static lg:translate-x-0
-          fixed inset-y-0 right-0 z-50 lg:right-auto lg:left-0
-          transition-transform duration-300 ease-out
-          ${mobileOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
-        `}
-      >
-        {/* Logo */}
-        <div className="h-16 flex items-center justify-between px-6 border-b border-[hsl(var(--border-default))]">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-            onClick={() => setMobileOpen(false)}
-          >
-            <Zap className="w-6 h-6 text-[hsl(var(--primary))]" />
-            <span className="text-lg font-bold">SpinBooking</span>
-          </Link>
-
-          {/* Close button (mobile only) */}
-          <button
-            onClick={() => setMobileOpen(false)}
-            className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[hsl(var(--surface-1))] transition-colors"
-            aria-label="Close menu"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <aside className="hidden lg:flex flex-col w-64 border-r border-[hsl(var(--border-default))] bg-[hsl(var(--background))]">
+      {/* Logo */}
+      <div className="h-16 flex items-center px-6 border-b border-[hsl(var(--border-default))]">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+        >
+          <Zap className="w-6 h-6 text-[hsl(var(--primary))]" />
+          <span className="text-lg font-bold">SpinBooking</span>
+        </Link>
+      </div>
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
@@ -106,11 +66,7 @@ export function Sidebar() {
                 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
               `}
               onClick={(e) => {
-                if (disabled) {
-                  e.preventDefault();
-                } else {
-                  setMobileOpen(false);
-                }
+                if (disabled) e.preventDefault();
               }}
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
@@ -147,6 +103,5 @@ export function Sidebar() {
         </Button>
       </div>
     </aside>
-    </>
   );
 }

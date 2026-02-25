@@ -45,7 +45,7 @@ export function PageHeader({
   }));
 
   return (
-    <header className="h-16 border-b border-[hsl(var(--border-default))] flex items-center justify-between pl-4 pr-16 lg:px-8">
+    <header className="h-16 border-b border-[hsl(var(--border-default))] flex items-center justify-between px-4 lg:px-8">
       <div className="min-w-0 flex-1">
         <h1 className="text-xl font-bold truncate">{title}</h1>
         {description && <p className="text-sm text-secondary truncate">{description}</p>}
