@@ -28,6 +28,7 @@ interface UserData {
   email: string;
   firstName: string;
   lastName: string;
+  nroDocumento: string;
   phone: string | null;
   role: string;
   status: string;
@@ -70,7 +71,21 @@ export default function AdminUsersPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+
+  // Create form state
+  const [createForm, setCreateForm] = useState({
+    firstName: '',
+    lastName: '',
+    nroDocumento: '',
+    email: '',
+    password: '',
+    phone: '',
+    role: 'MEMBER',
+  });
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated && user?.role === 'ADMIN') {
@@ -165,6 +180,24 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateLoading(true);
+    setCreateError(null);
+    try {
+      await api.post('/admin/users', createForm);
+      toast.success('Usuario creado exitosamente');
+      setShowCreateModal(false);
+      setCreateForm({ firstName: '', lastName: '', nroDocumento: '', email: '', password: '', phone: '', role: 'MEMBER' });
+      await loadUsers();
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      setCreateError(error.response?.data?.message || 'Error al crear usuario');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'ADMIN':
@@ -205,7 +238,7 @@ export default function AdminUsersPage() {
         title="Gestión de Usuarios"
         subtitle={`${pagination.total} usuarios en total`}
         action={
-          <Button variant="primary" size="sm" disabled>
+          <Button variant="primary" size="sm" onClick={() => setShowCreateModal(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Nuevo Usuario
           </Button>
@@ -324,6 +357,9 @@ export default function AdminUsersPage() {
                           Usuario
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">
+                          DNI
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">
                           Email
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider">
@@ -343,7 +379,7 @@ export default function AdminUsersPage() {
                     <tbody className="divide-y divide-[hsl(var(--border-default))]">
                       {users.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="px-6 py-12 text-center">
+                          <td colSpan={7} className="px-6 py-12 text-center">
                             <div className="flex flex-col items-center gap-2">
                               <Users className="w-12 h-12 text-tertiary" />
                               <p className="text-sm text-secondary">No se encontraron usuarios</p>
@@ -376,6 +412,9 @@ export default function AdminUsersPage() {
                                   )}
                                 </div>
                               </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              {userData.nroDocumento}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center gap-2">
@@ -471,6 +510,156 @@ export default function AdminUsersPage() {
           )}
       </div>
 
+      {/* Create User Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <Card variant="elevated" className="w-full max-w-lg m-4 max-h-[90vh] overflow-auto">
+            <div className="sticky top-0 bg-[hsl(var(--surface-0))] border-b border-[hsl(var(--border-default))] p-6 flex items-center justify-between">
+              <h2 className="text-xl font-bold">Nuevo Usuario</h2>
+              <button
+                onClick={() => { setShowCreateModal(false); setCreateError(null); }}
+                className="w-8 h-8 rounded-full hover:bg-[hsl(var(--surface-1))] flex items-center justify-center transition-colors"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+              {createError && (
+                <div className="flex items-center gap-2 p-3 rounded-[var(--radius-md)] bg-[hsl(var(--error)/0.08)] border border-[hsl(var(--error)/0.3)]">
+                  <AlertCircle className="w-4 h-4 text-[hsl(var(--error))] flex-shrink-0" />
+                  <p className="text-sm text-[hsl(var(--error))]">{createError}</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1" htmlFor="create-firstName">
+                    Nombre <span className="text-[hsl(var(--error))]">*</span>
+                  </label>
+                  <input
+                    id="create-firstName"
+                    type="text"
+                    name="firstName"
+                    required
+                    value={createForm.firstName}
+                    onChange={(e) => setCreateForm({ ...createForm, firstName: e.target.value })}
+                    className="w-full px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] border border-[hsl(var(--border-default))] bg-[hsl(var(--surface-0))] text-sm focus:outline-none focus:border-[hsl(var(--primary))]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1" htmlFor="create-lastName">
+                    Apellido <span className="text-[hsl(var(--error))]">*</span>
+                  </label>
+                  <input
+                    id="create-lastName"
+                    type="text"
+                    name="lastName"
+                    required
+                    value={createForm.lastName}
+                    onChange={(e) => setCreateForm({ ...createForm, lastName: e.target.value })}
+                    className="w-full px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] border border-[hsl(var(--border-default))] bg-[hsl(var(--surface-0))] text-sm focus:outline-none focus:border-[hsl(var(--primary))]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1" htmlFor="create-nroDocumento">
+                  Nro. de Documento (DNI) <span className="text-[hsl(var(--error))]">*</span>
+                </label>
+                <input
+                  id="create-nroDocumento"
+                  type="text"
+                  name="nroDocumento"
+                  required
+                  placeholder="Ej: 35678901"
+                  value={createForm.nroDocumento}
+                  onChange={(e) => setCreateForm({ ...createForm, nroDocumento: e.target.value })}
+                  className="w-full px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] border border-[hsl(var(--border-default))] bg-[hsl(var(--surface-0))] text-sm focus:outline-none focus:border-[hsl(var(--primary))]"
+                />
+                <p className="text-xs text-secondary mt-1">7 u 8 dígitos, solo números</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1" htmlFor="create-email">
+                  Email <span className="text-[hsl(var(--error))]">*</span>
+                </label>
+                <input
+                  id="create-email"
+                  type="email"
+                  name="email"
+                  required
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                  className="w-full px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] border border-[hsl(var(--border-default))] bg-[hsl(var(--surface-0))] text-sm focus:outline-none focus:border-[hsl(var(--primary))]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1" htmlFor="create-phone">
+                  Teléfono
+                </label>
+                <input
+                  id="create-phone"
+                  type="text"
+                  name="phone"
+                  value={createForm.phone}
+                  onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
+                  className="w-full px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] border border-[hsl(var(--border-default))] bg-[hsl(var(--surface-0))] text-sm focus:outline-none focus:border-[hsl(var(--primary))]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1" htmlFor="create-password">
+                  Contraseña <span className="text-[hsl(var(--error))]">*</span>
+                </label>
+                <input
+                  id="create-password"
+                  type="password"
+                  name="password"
+                  required
+                  value={createForm.password}
+                  onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                  className="w-full px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] border border-[hsl(var(--border-default))] bg-[hsl(var(--surface-0))] text-sm focus:outline-none focus:border-[hsl(var(--primary))]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1" htmlFor="create-role">
+                  Rol <span className="text-[hsl(var(--error))]">*</span>
+                </label>
+                <select
+                  id="create-role"
+                  name="role"
+                  required
+                  value={createForm.role}
+                  onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
+                  className="w-full px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] border border-[hsl(var(--border-default))] bg-[hsl(var(--surface-0))] text-sm focus:outline-none focus:border-[hsl(var(--primary))]"
+                >
+                  <option value="MEMBER">Miembro</option>
+                  <option value="INSTRUCTOR">Instructor</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
+              </div>
+
+              <div className="pt-4 border-t border-[hsl(var(--border-default))] flex gap-3">
+                <Button type="submit" variant="primary" size="sm" className="flex-1" disabled={createLoading}>
+                  {createLoading ? 'Creando...' : 'Crear Usuario'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setShowCreateModal(false); setCreateError(null); }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
       {/* User Details Modal */}
       {showUserModal && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -528,6 +717,13 @@ export default function AdminUsersPage() {
                     <Phone className="w-4 h-4 text-tertiary" />
                     <span className="text-sm">{selectedUser.phone || 'No especificado'}</span>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-secondary mb-1">
+                    Nro. de Documento (DNI)
+                  </label>
+                  <p className="text-sm font-medium">{selectedUser.nroDocumento}</p>
                 </div>
               </div>
 

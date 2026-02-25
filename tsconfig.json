@@ -27,13 +27,13 @@
         "./src/*"
       ],
       "@spinbooking/types": [
-        "../../packages/types/src"
+        "../SpinBooking-shared/types/src"
       ],
       "@spinbooking/validation": [
-        "../../packages/validation/src"
+        "../SpinBooking-shared/validation/src"
       ],
       "@spinbooking/utils": [
-        "../../packages/utils/src"
+        "../SpinBooking-shared/utils/src"
       ]
     }
   },

@@ -24,6 +24,7 @@ test.describe('Authentication Flow', () => {
     password: 'Test123!',
     firstName: 'Test',
     lastName: 'User',
+    nroDocumento: '35111222',
     phone: '+56912345678',
   };
 
@@ -38,12 +39,17 @@ test.describe('Authentication Flow', () => {
       await expect(page).toHaveURL('/register');
     });
 
+    await test.step('Verify DNI field is visible', async () => {
+      await expect(page.locator('input[name="nroDocumento"]')).toBeVisible();
+    });
+
     await test.step('Fill registration form', async () => {
       // Fill out all required fields
       await page.fill('input[name="email"]', TEST_USER.email);
       await page.fill('input[name="password"]', TEST_USER.password);
       await page.fill('input[name="firstName"]', TEST_USER.firstName);
       await page.fill('input[name="lastName"]', TEST_USER.lastName);
+      await page.fill('input[name="nroDocumento"]', TEST_USER.nroDocumento);
       await page.fill('input[name="phone"]', TEST_USER.phone);
 
       // Submit the form
@@ -257,6 +263,52 @@ test.describe('Authentication Flow', () => {
       });
 
       // Should stay on registration page
+      expect(page.url()).toContain('/register');
+    });
+  });
+
+  test('should reject registration with invalid DNI format', async ({ page }) => {
+    await test.step('Navigate to registration', async () => {
+      await page.goto('/register');
+    });
+
+    await test.step('Fill form with invalid DNI', async () => {
+      await page.fill('input[name="firstName"]', 'Test');
+      await page.fill('input[name="lastName"]', 'User');
+      await page.fill('input[name="nroDocumento"]', 'ABC1234');  // non-numeric
+      await page.fill('input[name="email"]', 'test@example.com');
+      await page.fill('input[name="password"]', 'Test123!');
+      await page.click('button[type="submit"]');
+    });
+
+    await test.step('Verify inline DNI validation error is shown', async () => {
+      await expect(
+        page.locator('text=/DNI debe tener 7 u 8 dígitos|DNI es requerido/i')
+      ).toBeVisible({ timeout: 2000 });
+      expect(page.url()).toContain('/register');
+    });
+  });
+
+  test('should reject registration with duplicate DNI', async ({ page }) => {
+    // Use a DNI that matches a seeded user (carolina.member has 35678901)
+    await test.step('Navigate to registration', async () => {
+      await page.goto('/register');
+    });
+
+    await test.step('Fill form with duplicate DNI', async () => {
+      await page.fill('input[name="firstName"]', 'Test');
+      await page.fill('input[name="lastName"]', 'User');
+      await page.fill('input[name="nroDocumento"]', '35678901'); // seeded — carolina.member
+      await page.locator('input[name="nroDocumento"]').blur();
+      await page.fill('input[name="email"]', `dup${Date.now()}@example.com`);
+      await page.fill('input[name="password"]', 'Test123!');
+      await page.click('button[type="submit"]');
+    });
+
+    await test.step('Verify duplicate DNI error is shown', async () => {
+      await expect(
+        page.locator('text=/DNI|documento|already|duplicado|registrado/i')
+      ).toBeVisible({ timeout: 5000 });
       expect(page.url()).toContain('/register');
     });
   });

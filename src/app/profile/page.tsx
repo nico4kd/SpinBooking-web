@@ -28,6 +28,7 @@ interface UserProfile {
   email: string;
   firstName: string;
   lastName: string;
+  nroDocumento: string;
   phone: string | null;
   role: string;
   status: string;
@@ -442,6 +443,13 @@ export default function ProfilePage() {
               <div className="flex items-center gap-3 text-sm">
                 <Shield className="w-5 h-5 text-tertiary flex-shrink-0" />
                 <div>
+                  <p className="text-secondary">Nro. de Documento (DNI)</p>
+                  <p className="font-medium">{profile.nroDocumento}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <Shield className="w-5 h-5 text-tertiary flex-shrink-0" />
+                <div>
                   <p className="text-secondary">Miembro desde</p>
                   <p className="font-medium">
                     {new Date(profile.createdAt).toLocaleDateString('es-ES', {
@@ -494,6 +502,16 @@ export default function ProfilePage() {
                   className="w-full px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] border border-[hsl(var(--border-default))] bg-[hsl(var(--surface-2))] text-tertiary cursor-not-allowed"
                 />
                 <p className="text-xs text-tertiary mt-1">El email no se puede cambiar</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Nro. de Documento (DNI)</label>
+                <input
+                  type="text"
+                  value={profile.nroDocumento}
+                  disabled
+                  className="w-full px-3 py-2 min-h-[44px] rounded-[var(--radius-md)] border border-[hsl(var(--border-default))] bg-[hsl(var(--surface-2))] text-tertiary cursor-not-allowed"
+                />
+                <p className="text-xs text-tertiary mt-1">El DNI no se puede cambiar desde el perfil</p>
               </div>
             </div>
           )}

@@ -21,6 +21,7 @@ import {
   Activity,
   Menu,
   X,
+  Settings2,
 } from 'lucide-react';
 
 interface NavItem {
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
   { href: '/admin/instructors', label: 'Instructores', icon: UserCog, zone: 'studio' },
   { href: '/admin/rooms', label: 'Salas', icon: MapPin, zone: 'studio' },
   { href: '/admin/payments', label: 'Pagos', icon: CreditCard, zone: 'studio' },
+  { href: '/admin/settings', label: 'Configuración', icon: Settings2, zone: 'studio' },
 
   // ANALYTICS - Performance data
   { href: '/admin/reports', label: 'Analytics', icon: BarChart3, zone: 'analytics' },
@@ -238,6 +240,7 @@ export function AdminSidebar() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => setMobileOpen(false)}
                   className={`
                     flex items-center gap-3 px-3 py-2
                     rounded-[var(--radius-md)] text-sm

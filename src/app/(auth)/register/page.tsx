@@ -5,6 +5,7 @@ import { useAuth } from '../../../context/auth-context';
 import Link from 'next/link';
 import { Button, Input, Card } from '../../../components/ui';
 import { UserPlus, Zap } from 'lucide-react';
+import { nroDocumentoSchema } from '@spinbooking/validation';
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -13,15 +14,24 @@ export default function RegisterPage() {
     password: '',
     firstName: '',
     lastName: '',
+    nroDocumento: '',
     phone: '',
   });
   const [error, setError] = useState('');
+  const [dniError, setDniError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+
+    const dniResult = nroDocumentoSchema.safeParse(formData.nroDocumento);
+    if (!dniResult.success) {
+      setDniError(dniResult.error.issues[0].message);
+      setLoading(false);
+      return;
+    }
 
     try {
       await register(formData);
@@ -37,6 +47,13 @@ export default function RegisterPage() {
       ...formData,
       [e.target.name]: e.target.value,
     });
+  };
+
+  const handleDniChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setFormData({ ...formData, nroDocumento: value });
+    const result = nroDocumentoSchema.safeParse(value);
+    setDniError(result.success ? '' : result.error.issues[0].message);
   };
 
   return (
@@ -100,6 +117,20 @@ export default function RegisterPage() {
                 onChange={handleChange}
               />
             </div>
+
+            <Input
+              label="Nro. de Documento (DNI)"
+              id="nroDocumento"
+              name="nroDocumento"
+              type="text"
+              inputMode="numeric"
+              required
+              placeholder="Ej: 35678901"
+              helperText={dniError ? undefined : '7 u 8 dígitos, solo números'}
+              error={dniError || undefined}
+              value={formData.nroDocumento}
+              onChange={handleDniChange}
+            />
 
             <Input
               label="Email"
