@@ -73,7 +73,7 @@ export default function PackagesPage() {
     setPurchasing(type);
     try {
       const response = await api.post('/packages/purchase', { type });
-      const packageId = response.data.id;
+      const packageId = response.data.package.id;
 
       // Redirect to checkout page
       router.push(`/packages/checkout/${packageId}`);

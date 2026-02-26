@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Bell, X, Check, Clock, Package, AlertTriangle, Calendar, PackageCheck } from 'lucide-react';
+import { Bell, X, Check, Clock, Package, AlertTriangle, Calendar, PackageCheck, ShoppingCart } from 'lucide-react';
 import { Button, Badge } from '../ui';
 import * as Popover from '@radix-ui/react-popover';
 import { formatDistanceToNow } from 'date-fns';
@@ -9,7 +9,7 @@ import { es } from 'date-fns/locale';
 
 export interface Notification {
   id: string;
-  type: 'class_reminder' | 'waitlist' | 'credits_expiring' | 'new_class' | 'booking_confirmed' | 'class_cancelled' | 'PACKAGE_ACTIVATED';
+  type: 'class_reminder' | 'waitlist' | 'credits_expiring' | 'new_class' | 'booking_confirmed' | 'class_cancelled' | 'PACKAGE_ACTIVATED' | 'PACKAGE_PURCHASED';
   title: string;
   message: string;
   createdAt: string;
@@ -67,6 +67,8 @@ export function NotificationCenter({
         return X;
       case 'PACKAGE_ACTIVATED':
         return PackageCheck;
+      case 'PACKAGE_PURCHASED':
+        return ShoppingCart;
       default:
         return Bell;
     }
@@ -88,6 +90,8 @@ export function NotificationCenter({
         return 'destructive';
       case 'PACKAGE_ACTIVATED':
         return 'success';
+      case 'PACKAGE_PURCHASED':
+        return 'warning';
       default:
         return 'default';
     }

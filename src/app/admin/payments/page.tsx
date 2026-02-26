@@ -137,6 +137,19 @@ export default function AdminPaymentsPage() {
     }
   }, [isAuthenticated, user, page, statusFilter, methodFilter, startDate, endDate]);
 
+  // Polling: auto-refresh pending manual payments every 15 seconds so new
+  // incoming BANK_TRANSFER / IN_PERSON_CASH submissions appear without a
+  // manual browser reload. clearInterval in cleanup prevents memory leaks.
+  useEffect(() => {
+    if (!isAuthenticated || user?.role !== 'ADMIN') return;
+
+    const intervalId = setInterval(() => {
+      loadPendingManualPayments();
+    }, 15_000);
+
+    return () => clearInterval(intervalId);
+  }, [isAuthenticated, user]);
+
   const loadPayments = async () => {
     setLoadingData(true);
     setError(null);
@@ -219,7 +232,7 @@ export default function AdminPaymentsPage() {
       setPendingManualPayments(response.data || []);
     } catch (error: any) {
       console.error('Error loading pending manual payments:', error);
-      setPendingManualPayments([]);
+      // Do not wipe displayed data on polling error — keep stale data visible
     } finally {
       setLoadingPending(false);
     }
@@ -738,7 +751,6 @@ export default function AdminPaymentsPage() {
               </Card>
             )}
           </div>
-        </div>
 
         {/* Filters */}
         <div className="border-b border-[hsl(var(--border-default))] bg-[hsl(var(--surface-0))] p-6">
