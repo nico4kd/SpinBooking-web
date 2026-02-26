@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../../context/auth-context';
 import api from '../../../lib/api-client';
+import { InstructorStatus } from '../../../lib/api';
+import { getInstructorStatusBadge } from '../../../lib/utils/status-badges';
 import { Card, Button, Badge } from '../../../components/ui';
 import { AdminLayout, AdminPageHeader, ConsoleMetric } from '../../../components/admin';
 import {
@@ -252,16 +254,7 @@ export default function AdminInstructorsPage() {
     setSelectedInstructor(null);
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return <Badge variant="success">Activo</Badge>;
-      case 'INACTIVE':
-        return <Badge variant="default">Inactivo</Badge>;
-      default:
-        return <Badge variant="default">{status}</Badge>;
-    }
-  };
+  const getStatusBadge = getInstructorStatusBadge;
 
   return (
     <>
@@ -456,7 +449,7 @@ export default function AdminInstructorsPage() {
                             <Edit className="w-3 h-3 mr-1" />
                             Editar
                           </Button>
-                          {instructor.status === 'ACTIVE' && (
+                          {instructor.status === InstructorStatus.ACTIVE && (
                             <Button
                               variant="outline"
                               size="sm"

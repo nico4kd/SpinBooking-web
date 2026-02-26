@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../../context/auth-context';
 import api from '../../../lib/api-client';
+import { getBookingStatusBadge } from '../../../lib/utils/status-badges';
 import {
   Card,
   Badge,
@@ -100,20 +101,7 @@ export default function AdminDashboardPage() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'CONFIRMED':
-        return <Badge variant="success">Confirmada</Badge>;
-      case 'CANCELLED':
-        return <Badge variant="default">Cancelada</Badge>;
-      case 'ATTENDED':
-        return <Badge variant="primary">Asistió</Badge>;
-      case 'NO_SHOW':
-        return <Badge variant="warning">No Asistió</Badge>;
-      default:
-        return <Badge variant="default">{status}</Badge>;
-    }
-  };
+  const getStatusBadge = getBookingStatusBadge;
 
   return (
     <AdminLayout>

@@ -1,23 +1,17 @@
 /**
- * Format currency amount in Chilean Peso format
- * @param amount - Amount to format
- * @returns Formatted currency string (e.g., "$18.000")
+ * Currency formatting utilities.
+ *
+ * Re-exports the canonical formatCurrency from the shared package (es-AR / ARS)
+ * and adds a convenience formatNumber helper for the frontend.
  */
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('es-CL', {
-    style: 'currency',
-    currency: 'CLP',
-    minimumFractionDigits: 0,
-  }).format(amount);
-}
+
+export { formatCurrency } from '@spinbooking/utils';
 
 /**
- * Format currency without symbol
- * @param amount - Amount to format
- * @returns Formatted number string (e.g., "18.000")
+ * Format a number without currency symbol (Argentine locale)
  */
 export function formatNumber(amount: number): string {
-  return new Intl.NumberFormat('es-CL', {
+  return new Intl.NumberFormat('es-AR', {
     minimumFractionDigits: 0,
   }).format(amount);
 }

@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/auth-context';
-import api from '../../lib/api-client';
+import { packagesApi } from '../../lib/api';
+import type { PackageConfig, UserPackage } from '../../lib/api';
+import { PackageStatus, PaymentStatus } from '../../lib/api';
+import { getPackageStatusBadge } from '../../lib/utils/status-badges';
 import { Card, Button, Badge, IntensityRing } from '../../components/ui';
 import { AppLayout, PageHeader } from '../../components/Layout';
 import { toast } from '../../lib/toast';
@@ -13,32 +16,6 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-
-interface PackageConfig {
-  type: string;
-  name: string;
-  tickets: number;
-  price: number;
-  validityDays: number;
-  description: string;
-}
-
-interface UserPackage {
-  id: string;
-  type: string;
-  status: string;
-  totalTickets: number;
-  remainingTickets: number;
-  price: number;
-  currency: string;
-  expiresAt: string;
-  createdAt: string;
-  payment?: {
-    status: string;
-    method: string;
-    paidAt: string;
-  };
-}
 
 export default function PackagesPage() {
   const { isAuthenticated } = useAuth();
@@ -56,12 +33,12 @@ export default function PackagesPage() {
 
   const loadData = async () => {
     try {
-      const [typesRes, packagesRes] = await Promise.all([
-        api.get('/packages/types'),
-        api.get('/packages'),
+      const [types, packages] = await Promise.all([
+        packagesApi.getTypes(),
+        packagesApi.getUserPackages(),
       ]);
-      setPackageTypes(typesRes.data);
-      setUserPackages(packagesRes.data);
+      setPackageTypes(types);
+      setUserPackages(packages);
     } catch (error) {
       console.error('Error loading packages:', error);
     } finally {
@@ -72,8 +49,8 @@ export default function PackagesPage() {
   const handlePurchase = async (type: string) => {
     setPurchasing(type);
     try {
-      const response = await api.post('/packages/purchase', { type });
-      const packageId = response.data.package.id;
+      const result = await packagesApi.purchase({ type });
+      const packageId = result.package.id;
 
       // Redirect to checkout page
       router.push(`/packages/checkout/${packageId}`);
@@ -86,21 +63,6 @@ export default function PackagesPage() {
         }
       );
       setPurchasing(null);
-    }
-  };
-
-  const getPackageStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return <Badge variant="success">Activo</Badge>;
-      case 'PENDING':
-        return <Badge variant="warning">Pendiente de pago</Badge>;
-      case 'EXPIRED':
-        return <Badge variant="default">Expirado</Badge>;
-      case 'DEPLETED':
-        return <Badge variant="default">Agotado</Badge>;
-      default:
-        return <Badge variant="default">{status}</Badge>;
     }
   };
 
@@ -121,7 +83,7 @@ export default function PackagesPage() {
   };
 
   const activePackages = userPackages.filter(
-    (pkg) => pkg.status === 'ACTIVE' && pkg.remainingTickets > 0
+    (pkg) => pkg.status === PackageStatus.ACTIVE && pkg.remainingTickets > 0
   );
 
   const totalCredits = activePackages.reduce(
@@ -191,7 +153,7 @@ export default function PackagesPage() {
               <h2 className="text-lg font-semibold mb-4">Mis Paquetes Activos</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {activePackages.map((pkg) => {
-                  const daysRemaining = getDaysRemaining(pkg.expiresAt);
+                  const daysRemaining = pkg.expiresAt ? getDaysRemaining(pkg.expiresAt) : 0;
                   const progress = (pkg.remainingTickets / pkg.totalTickets) * 100;
 
                   return (
@@ -233,7 +195,7 @@ export default function PackagesPage() {
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-secondary">Vence el</span>
                           <span className="font-semibold">
-                            {formatDate(pkg.expiresAt)}
+                            {pkg.expiresAt ? formatDate(pkg.expiresAt) : '—'}
                           </span>
                         </div>
                       </div>
@@ -361,9 +323,9 @@ export default function PackagesPage() {
                           ${pkg.price.toLocaleString()} {pkg.currency}
                         </p>
                         <p className="text-sm text-secondary">
-                          {pkg.payment?.status === 'COMPLETED'
+                          {pkg.payment?.status === PaymentStatus.APPROVED
                             ? 'Pagado'
-                            : pkg.payment?.status === 'PENDING'
+                            : pkg.payment?.status === PaymentStatus.PENDING
                             ? 'Pendiente'
                             : 'Sin pagar'}
                         </p>

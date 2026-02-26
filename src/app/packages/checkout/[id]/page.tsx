@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../../../context/auth-context';
 import { useRouter, useParams } from 'next/navigation';
 import api from '../../../../lib/api-client';
+import { PackageStatus, PaymentStatus } from '../../../../lib/api';
 import { formatCurrency } from '../../../../lib/utils/currency';
 import { Card, Button, Badge } from '../../../../components/ui';
 import {
@@ -97,7 +98,7 @@ export default function CheckoutPage() {
 
       if (pkgRes.status === 'fulfilled') {
         const pkg = pkgRes.value.data;
-        if (pkg.status === 'ACTIVE' || pkg.payment?.status === 'COMPLETED') {
+        if (pkg.status === PackageStatus.ACTIVE || pkg.payment?.status === PaymentStatus.APPROVED) {
           router.push('/packages');
           return;
         }

@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../../context/auth-context';
 import api from '../../../../lib/api-client';
+import { WaitlistStatus } from '../../../../lib/api';
 import { Card, Button, Badge } from '../../../../components/ui';
+import { getDifficultyBadge } from '../../../../lib/utils/difficulty';
 import BikeSelectionModal from '../../../../components/BikeSelectionModal';
 import { toast } from '../../../../lib/toast';
 import {
@@ -186,21 +188,6 @@ export default function WaitlistAcceptPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getDifficultyBadge = (level: string) => {
-    switch (level) {
-      case 'BEGINNER':
-        return <Badge variant="success">Principiante</Badge>;
-      case 'INTERMEDIATE':
-        return <Badge variant="primary">Intermedio</Badge>;
-      case 'ADVANCED':
-        return <Badge variant="hot">Avanzado</Badge>;
-      case 'ALL_LEVELS':
-        return <Badge variant="default">Todos los niveles</Badge>;
-      default:
-        return <Badge variant="default">{level}</Badge>;
-    }
-  };
-
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -236,20 +223,20 @@ export default function WaitlistAcceptPage() {
   }
 
   // Check if already responded
-  if (waitlistEntry.status !== 'NOTIFIED') {
+  if (waitlistEntry.status !== WaitlistStatus.NOTIFIED) {
     let statusMessage = '';
     let statusIcon = <CheckCircle2 className="w-8 h-8" />;
     let statusColor = 'success';
 
-    if (waitlistEntry.status === 'ACCEPTED') {
+    if (waitlistEntry.status === WaitlistStatus.ACCEPTED) {
       statusMessage = '¡Ya aceptaste este lugar! Revisa tus reservas.';
       statusColor = 'success';
       statusIcon = <CheckCircle2 className="w-8 h-8 text-[hsl(var(--success))]" />;
-    } else if (waitlistEntry.status === 'DECLINED') {
+    } else if (waitlistEntry.status === WaitlistStatus.DECLINED) {
       statusMessage = 'Rechazaste este lugar. El spot fue ofrecido a otra persona.';
       statusColor = 'default';
       statusIcon = <XCircle className="w-8 h-8 text-tertiary" />;
-    } else if (waitlistEntry.status === 'EXPIRED') {
+    } else if (waitlistEntry.status === WaitlistStatus.EXPIRED) {
       statusMessage = 'Esta oferta expiró. El tiempo límite se alcanzó.';
       statusColor = 'warning';
       statusIcon = <Hourglass className="w-8 h-8 text-[hsl(var(--warning))]" />;
@@ -268,15 +255,15 @@ export default function WaitlistAcceptPage() {
             </div>
             <div>
               <h2 className="text-xl font-bold mb-2">
-                {waitlistEntry.status === 'ACCEPTED' ? '¡Lugar Aceptado!' : 'Oferta No Disponible'}
+                {waitlistEntry.status === WaitlistStatus.ACCEPTED ? '¡Lugar Aceptado!' : 'Oferta No Disponible'}
               </h2>
               <p className="text-secondary">{statusMessage}</p>
             </div>
             <Button
               variant="primary"
-              onClick={() => router.push(waitlistEntry.status === 'ACCEPTED' ? '/bookings' : '/classes')}
+              onClick={() => router.push(waitlistEntry.status === WaitlistStatus.ACCEPTED ? '/bookings' : '/classes')}
             >
-              {waitlistEntry.status === 'ACCEPTED' ? 'Ver Mis Reservas' : 'Volver a Clases'}
+              {waitlistEntry.status === WaitlistStatus.ACCEPTED ? 'Ver Mis Reservas' : 'Volver a Clases'}
             </Button>
           </div>
         </Card>

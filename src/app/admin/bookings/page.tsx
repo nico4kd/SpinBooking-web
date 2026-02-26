@@ -3,8 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../../context/auth-context';
 import api from '../../../lib/api-client';
+import { BookingStatus } from '../../../lib/api';
+import { getBookingStatusBadge } from '../../../lib/utils/status-badges';
 import { AdminLayout, AdminPageHeader, ConsoleMetric } from '../../../components/admin';
 import { Card, Button, Badge, DatePicker, Select, SkeletonTable } from '../../../components/ui';
+import { getDifficultyBadge } from '../../../lib/utils/difficulty';
 import {
   Package,
   Filter,
@@ -136,10 +139,10 @@ export default function AdminBookingsPage() {
 
       // Calculate stats
       const total = bookingsData.length;
-      const confirmed = bookingsData.filter((b: BookingData) => b.status === 'CONFIRMED').length;
-      const attended = bookingsData.filter((b: BookingData) => b.status === 'ATTENDED').length;
-      const noShow = bookingsData.filter((b: BookingData) => b.status === 'NO_SHOW').length;
-      const cancelled = bookingsData.filter((b: BookingData) => b.status === 'CANCELLED').length;
+      const confirmed = bookingsData.filter((b: BookingData) => b.status === BookingStatus.CONFIRMED).length;
+      const attended = bookingsData.filter((b: BookingData) => b.status === BookingStatus.ATTENDED).length;
+      const noShow = bookingsData.filter((b: BookingData) => b.status === BookingStatus.NO_SHOW).length;
+      const cancelled = bookingsData.filter((b: BookingData) => b.status === BookingStatus.CANCELLED).length;
       const attendanceRate = attended + noShow > 0 ? (attended / (attended + noShow)) * 100 : 0;
 
       setStats({
@@ -215,35 +218,7 @@ export default function AdminBookingsPage() {
     setShowDetailsModal(true);
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'CONFIRMED':
-        return <Badge variant="success">Confirmada</Badge>;
-      case 'CANCELLED':
-        return <Badge variant="default">Cancelada</Badge>;
-      case 'ATTENDED':
-        return <Badge variant="primary">Asistió</Badge>;
-      case 'NO_SHOW':
-        return <Badge variant="warning">No Asistió</Badge>;
-      default:
-        return <Badge variant="default">{status}</Badge>;
-    }
-  };
-
-  const getDifficultyBadge = (level: string) => {
-    switch (level) {
-      case 'BEGINNER':
-        return <Badge variant="success">Principiante</Badge>;
-      case 'INTERMEDIATE':
-        return <Badge variant="primary">Intermedio</Badge>;
-      case 'ADVANCED':
-        return <Badge variant="hot">Avanzado</Badge>;
-      case 'ALL_LEVELS':
-        return <Badge variant="default">Todos</Badge>;
-      default:
-        return <Badge variant="default">{level}</Badge>;
-    }
-  };
+  const getStatusBadge = getBookingStatusBadge;
 
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString('es-ES', {
@@ -384,10 +359,10 @@ export default function AdminBookingsPage() {
                     }}
                     options={[
                       { value: '', label: 'Todos los estados' },
-                      { value: 'CONFIRMED', label: 'Confirmada' },
-                      { value: 'ATTENDED', label: 'Asistió' },
-                      { value: 'NO_SHOW', label: 'No Asistió' },
-                      { value: 'CANCELLED', label: 'Cancelada' },
+                      { value: BookingStatus.CONFIRMED, label: 'Confirmada' },
+                      { value: BookingStatus.ATTENDED, label: 'Asistió' },
+                      { value: BookingStatus.NO_SHOW, label: 'No Asistió' },
+                      { value: BookingStatus.CANCELLED, label: 'Cancelada' },
                     ]}
                     placeholder="Seleccionar estado"
                   />
@@ -497,7 +472,7 @@ export default function AdminBookingsPage() {
                                   <Eye className="w-3 h-3 mr-1" />
                                   Ver
                                 </Button>
-                                {booking.status === 'CONFIRMED' && (
+                                {booking.status === BookingStatus.CONFIRMED && (
                                   <>
                                     <Button
                                       variant="outline"
@@ -639,7 +614,7 @@ export default function AdminBookingsPage() {
 
               {/* Actions */}
               <div className="pt-4 border-t border-[hsl(var(--border-default))] flex gap-3">
-                {selectedBooking.status === 'CONFIRMED' && (
+                {selectedBooking.status === BookingStatus.CONFIRMED && (
                   <>
                     <Button
                       variant="primary"

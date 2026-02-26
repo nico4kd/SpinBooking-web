@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuth } from '../../context/auth-context';
+import { bookingsApi, classesApi, BookingStatus } from '../../lib/api';
+import type { ClassWithAvailability, Booking, PaginatedResponse } from '../../lib/api';
 import api from '../../lib/api-client';
 import {
   Card,
@@ -28,45 +30,7 @@ import {
   List,
 } from 'lucide-react';
 import { startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
-import type { Class as BaseClass, Booking as BaseBooking } from '@spinbooking/types';
-
-// Extend base types with API-specific computed fields
-interface ClassWithAvailability extends Omit<BaseClass, 'startTime' | 'createdAt' | 'updatedAt'> {
-  startTime: string; // API returns as ISO string
-  room: {
-    id: string;
-    name: string;
-    location: string | null;
-    capacity: number;
-  };
-  instructor: {
-    id: string;
-    user: {
-      firstName: string;
-      lastName: string;
-    };
-  };
-  // Computed fields from API
-  spotsAvailable: number;
-  isFull: boolean;
-  fewSpotsLeft: boolean;
-  waitlistCount: number;
-}
-
-// Generic pagination response type
-interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
-type ClassesResponse = PaginatedResponse<ClassWithAvailability>;
-type BookingsResponse = PaginatedResponse<BaseBooking>;
-
+import { getDifficultyBadge } from '../../lib/utils/difficulty';
 type ViewMode = 'calendar' | 'list';
 
 export default function ClassesPage() {
@@ -117,7 +81,7 @@ export default function ClassesPage() {
   const loadClasses = async (signal?: AbortSignal) => {
     setLoadingData(true);
     try {
-      const params: any = {};
+      const params: Record<string, string | number | boolean> = {};
 
       // For calendar view, load current week
       if (viewMode === 'calendar') {
@@ -140,7 +104,7 @@ export default function ClassesPage() {
         params.difficultyLevel = difficultyFilter;
       }
 
-      const response = await api.get<ClassesResponse>('/classes', {
+      const response = await api.get<PaginatedResponse<ClassWithAvailability>>('/classes', {
         params,
         signal,
       });
@@ -157,7 +121,7 @@ export default function ClassesPage() {
 
   const loadUserBookings = async (signal?: AbortSignal) => {
     try {
-      const response = await api.get<BookingsResponse>('/bookings', {
+      const response = await api.get<PaginatedResponse<Booking>>('/bookings', {
         params: {
           upcoming: true,
           limit: 100,
@@ -165,7 +129,7 @@ export default function ClassesPage() {
         signal,
       });
       const bookingClassIds = response.data.data
-        .filter((b) => b.status === 'CONFIRMED')
+        .filter((b) => b.status === BookingStatus.CONFIRMED)
         .map((b) => b.classId);
       setUserBookings(bookingClassIds);
     } catch (error: any) {
@@ -188,9 +152,9 @@ export default function ClassesPage() {
 
     setBookingClass(pendingClassId);
     try {
-      await api.post('/bookings', {
+      await bookingsApi.create({
         classId: pendingClassId,
-        bikeNumber, // Can be null for auto-assignment
+        bikeNumber,
       });
 
       toast.success(
@@ -237,21 +201,6 @@ export default function ClassesPage() {
       );
     }
   }, []);
-
-  const getDifficultyBadge = (level: string) => {
-    switch (level) {
-      case 'BEGINNER':
-        return <Badge variant="success">Principiante</Badge>;
-      case 'INTERMEDIATE':
-        return <Badge variant="primary">Intermedio</Badge>;
-      case 'ADVANCED':
-        return <Badge variant="hot">Avanzado</Badge>;
-      case 'ALL_LEVELS':
-        return <Badge variant="default">Todos los niveles</Badge>;
-      default:
-        return <Badge variant="default">{level}</Badge>;
-    }
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-ES', {

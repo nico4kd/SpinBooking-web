@@ -3,7 +3,8 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useAuth } from '../../../context/auth-context';
 import { useRouter, useSearchParams } from 'next/navigation';
-import api from '../../../lib/api-client';
+import { packagesApi, PackageStatus } from '../../../lib/api';
+import type { UserPackage } from '../../../lib/api';
 import { formatCurrency } from '../../../lib/utils/currency';
 import { Card, Button, Badge } from '../../../components/ui';
 import {
@@ -16,20 +17,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-interface PackageData {
-  id: string;
-  type: string;
-  status: string;
-  totalTickets: number;
-  remainingTickets: number;
-  price: number;
-  currency: string;
-  expiresAt: string;
-  createdAt: string;
-  tickets?: Array<{
-    id: string;
-    status: string;
-  }>;
+interface PackageData extends UserPackage {
+  tickets?: Array<{ id: string; status: string }>;
 }
 
 // Map package types to Spanish display names
@@ -79,13 +68,12 @@ function SuccessPageContent() {
     if (!packageId) return;
 
     try {
-      const response = await api.get(`/packages/${packageId}`);
-      const pkg = response.data;
+      const pkg = await packagesApi.getById(packageId) as PackageData;
 
       setPackageData(pkg);
 
       // Check if package is active
-      if (pkg.status === 'ACTIVE') {
+      if (pkg.status === PackageStatus.ACTIVE) {
         setIsActivating(false);
         return;
       }
@@ -168,7 +156,7 @@ function SuccessPageContent() {
   const packageName = packageData
     ? PACKAGE_NAMES[packageData.type] || packageData.type
     : '';
-  const validityDays = packageData
+  const validityDays = packageData?.expiresAt
     ? getValidityDays(packageData.expiresAt, packageData.createdAt)
     : 0;
   const activeTicketsCount = packageData?.tickets?.filter(
@@ -189,7 +177,7 @@ function SuccessPageContent() {
               <p className="text-secondary">
                 Estamos activando tu paquete, por favor espera un momento...
               </p>
-            ) : packageData?.status === 'ACTIVE' ? (
+            ) : packageData?.status === PackageStatus.ACTIVE ? (
               <p className="text-secondary">
                 Tu paquete ha sido activado y está listo para usar
               </p>
@@ -221,7 +209,7 @@ function SuccessPageContent() {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <h2 className="text-xl font-bold">{packageName}</h2>
-                  {packageData.status === 'ACTIVE' ? (
+                  {packageData.status === PackageStatus.ACTIVE ? (
                     <Badge variant="success">Activo</Badge>
                   ) : (
                     <Badge variant="warning">Procesando</Badge>
@@ -244,7 +232,7 @@ function SuccessPageContent() {
                     ? 'Ilimitados'
                     : packageData.totalTickets}
                 </p>
-                {packageData.status === 'ACTIVE' && activeTicketsCount && (
+                {packageData.status === PackageStatus.ACTIVE && activeTicketsCount && (
                   <p className="text-xs text-secondary mt-1">
                     {activeTicketsCount} tickets disponibles
                   </p>
@@ -291,7 +279,7 @@ function SuccessPageContent() {
         )}
 
         {/* Next Steps */}
-        {packageData?.status === 'ACTIVE' && !isActivating && (
+        {packageData?.status === PackageStatus.ACTIVE && !isActivating && (
           <Card variant="default">
             <h3 className="font-semibold mb-3">¿Qué sigue?</h3>
             <div className="space-y-3">

@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../../context/auth-context';
 import api from '../../../lib/api-client';
+import { UserStatus } from '../../../lib/api';
+import { getUserStatusBadge } from '../../../lib/utils/status-badges';
 import { Card, Button, Badge, SkeletonTable } from '../../../components/ui';
 import { AdminLayout, AdminPageHeader } from '../../../components/admin';
 import {
@@ -211,18 +213,7 @@ export default function AdminUsersPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return <Badge variant="success">Activo</Badge>;
-      case 'SUSPENDED':
-        return <Badge variant="warning">Suspendido</Badge>;
-      case 'DELETED':
-        return <Badge variant="default">Eliminado</Badge>;
-      default:
-        return <Badge variant="default">{status}</Badge>;
-    }
-  };
+  const getStatusBadge = getUserStatusBadge;
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-ES', {
@@ -444,7 +435,7 @@ export default function AdminUsersPage() {
                                   <User className="w-3 h-3 mr-1" />
                                   Ver
                                 </Button>
-                                {userData.status === 'ACTIVE' ? (
+                                {userData.status === UserStatus.ACTIVE ? (
                                   <Button
                                     variant="outline"
                                     size="sm"

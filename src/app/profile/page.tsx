@@ -3,7 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/auth-context';
-import api from '../../lib/api-client';
+import { usersApi, bookingsApi, packagesApi } from '../../lib/api';
+import type { UserProfile, UserPackage } from '../../lib/api';
+import { BookingStatus, PackageStatus, Role } from '../../lib/api';
+import { getUserStatusBadge, getPackageStatusBadge } from '../../lib/utils/status-badges';
 import { Card, Button, Badge } from '../../components/ui';
 import { AppLayout, PageHeader } from '../../components/Layout';
 import { toast } from '../../lib/toast';
@@ -23,36 +26,11 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
-interface UserProfile {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  nroDocumento: string;
-  phone: string | null;
-  role: string;
-  status: string;
-  emailVerified: boolean;
-  createdAt: string;
-}
-
-interface UserStats {
+interface ProfileStats {
   totalBookings: number;
   attendedClasses: number;
   activePackages: number;
   totalCredits: number;
-}
-
-interface PackageSummary {
-  id: string;
-  type: string;
-  status: string;
-  totalTickets: number;
-  remainingTickets: number;
-  usedTickets: number;
-  expiresAt: string | null;
-  activatedAt: string | null;
-  createdAt: string;
 }
 
 const PACKAGE_LABELS: Record<string, string> = {
@@ -69,8 +47,8 @@ export default function ProfilePage() {
 
   // Profile data
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [stats, setStats] = useState<UserStats | null>(null);
-  const [packages, setPackages] = useState<PackageSummary[]>([]);
+  const [stats, setStats] = useState<ProfileStats | null>(null);
+  const [packages, setPackages] = useState<UserPackage[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -108,31 +86,30 @@ export default function ProfilePage() {
     setLoadingData(true);
     setError(null);
     try {
-      const [profileRes, bookingsRes, packagesRes] = await Promise.all([
-        api.get('/users/me'),
-        api.get('/bookings'),
-        api.get('/packages'),
+      const [profileData, bookingsData, allPackages] = await Promise.all([
+        usersApi.getProfile(),
+        bookingsApi.list(),
+        packagesApi.getUserPackages(),
       ]);
 
-      setProfile(profileRes.data);
+      setProfile(profileData);
 
-      const bookings = bookingsRes.data.data || [];
-      const allPackages: PackageSummary[] = packagesRes.data || [];
+      const bookings = bookingsData.data || [];
 
       setPackages(allPackages);
 
-      const activePackages = allPackages.filter((p) => p.status === 'ACTIVE');
+      const activePackages = allPackages.filter((p) => p.status === PackageStatus.ACTIVE);
       setStats({
         totalBookings: bookings.length,
-        attendedClasses: bookings.filter((b: any) => b.status === 'ATTENDED').length,
+        attendedClasses: bookings.filter((b: any) => b.status === BookingStatus.ATTENDED).length,
         activePackages: activePackages.length,
         totalCredits: activePackages.reduce((sum, pkg) => sum + pkg.remainingTickets, 0),
       });
 
       setEditForm({
-        firstName: profileRes.data.firstName,
-        lastName: profileRes.data.lastName,
-        phone: profileRes.data.phone || '',
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        phone: profileData.phone || '',
       });
     } catch (err) {
       console.error('Error loading profile:', err);
@@ -145,10 +122,10 @@ export default function ProfilePage() {
   const handleSaveProfile = async () => {
     setSaving(true);
     try {
-      await api.patch('/users/me', {
+      await usersApi.updateProfile({
         firstName: editForm.firstName,
         lastName: editForm.lastName,
-        phone: editForm.phone || null,
+        phone: editForm.phone || undefined,
       });
 
       // Update AuthContext so sidebar reflects new name immediately
@@ -181,7 +158,7 @@ export default function ProfilePage() {
 
     setChangingPassword(true);
     try {
-      await api.patch('/users/me/password', {
+      await usersApi.changePassword({
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
       });
@@ -210,7 +187,7 @@ export default function ProfilePage() {
     if (!doubleConfirm) return;
 
     try {
-      await api.delete('/users/me');
+      await usersApi.deleteAccount();
       toast.success('Cuenta eliminada', { description: 'Serás redirigido al inicio' });
       logout();
     } catch (err: any) {
@@ -222,42 +199,16 @@ export default function ProfilePage() {
 
   const getRoleBadge = (role: string) => {
     switch (role) {
-      case 'ADMIN':
+      case Role.ADMIN:
         return <Badge variant="hot">Admin</Badge>;
-      case 'INSTRUCTOR':
+      case Role.INSTRUCTOR:
         return <Badge variant="primary">Instructor</Badge>;
       default:
         return <Badge variant="default">Miembro</Badge>;
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return <Badge variant="success">Activa</Badge>;
-      case 'SUSPENDED':
-        return <Badge variant="warning">Suspendida</Badge>;
-      case 'DELETED':
-        return <Badge variant="default">Eliminada</Badge>;
-      default:
-        return <Badge variant="default">{status}</Badge>;
-    }
-  };
-
-  const getPackageStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return <Badge variant="success">Activo</Badge>;
-      case 'PENDING':
-        return <Badge variant="warning">Pendiente</Badge>;
-      case 'EXPIRED':
-        return <Badge variant="default">Vencido</Badge>;
-      case 'DEPLETED':
-        return <Badge variant="default">Agotado</Badge>;
-      default:
-        return <Badge variant="default">{status}</Badge>;
-    }
-  };
+  const getStatusBadge = getUserStatusBadge;
 
   // Loading state — show layout + spinner
   if (loading || loadingData) {

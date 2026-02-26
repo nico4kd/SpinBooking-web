@@ -3,7 +3,8 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useAuth } from '../../../context/auth-context';
 import { useRouter, useSearchParams } from 'next/navigation';
-import api from '../../../lib/api-client';
+import { packagesApi } from '../../../lib/api';
+import type { UserPackage } from '../../../lib/api';
 import { formatCurrency } from '../../../lib/utils/currency';
 import { Card, Button, Badge } from '../../../components/ui';
 import {
@@ -15,17 +16,6 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import Link from 'next/link';
-
-interface PackageData {
-  id: string;
-  type: string;
-  status: string;
-  totalTickets: number;
-  price: number;
-  currency: string;
-  expiresAt: string;
-  createdAt: string;
-}
 
 // Map package types to Spanish display names
 const PACKAGE_NAMES: Record<string, string> = {
@@ -44,7 +34,7 @@ function PendingPageContent() {
   const packageId = searchParams.get('packageId');
   const paymentId = searchParams.get('payment_id');
 
-  const [packageData, setPackageData] = useState<PackageData | null>(null);
+  const [packageData, setPackageData] = useState<UserPackage | null>(null);
   const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
@@ -65,8 +55,8 @@ function PendingPageContent() {
     if (!packageId) return;
 
     try {
-      const response = await api.get(`/packages/${packageId}`);
-      setPackageData(response.data);
+      const data = await packagesApi.getById(packageId);
+      setPackageData(data);
     } catch (error: any) {
       console.error('Error loading package:', error);
       // Don't show error, just proceed without package data
@@ -100,7 +90,7 @@ function PendingPageContent() {
   const packageName = packageData
     ? PACKAGE_NAMES[packageData.type] || packageData.type
     : 'Paquete';
-  const validityDays = packageData
+  const validityDays = packageData?.expiresAt
     ? getValidityDays(packageData.expiresAt, packageData.createdAt)
     : 0;
 

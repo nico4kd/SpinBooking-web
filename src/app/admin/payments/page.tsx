@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../../context/auth-context';
 import api from '../../../lib/api-client';
+import { getPaymentStatusBadge as getPaymentStatusBadgeShared } from '../../../lib/utils/status-badges';
+import { PaymentStatus, PaymentMethod } from '@spinbooking/types';
 import { Card, Button, Badge, DatePicker, Select } from '../../../components/ui';
 import { AdminLayout, AdminPageHeader } from '../../../components/admin';
 import {
@@ -176,16 +178,16 @@ export default function AdminPaymentsPage() {
       const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
       const totalRevenue = paymentsData
-        .filter((p: PaymentData) => p.status === 'APPROVED')
+        .filter((p: PaymentData) => p.status === PaymentStatus.APPROVED)
         .reduce((sum: number, p: PaymentData) => sum + p.amount, 0);
 
       const pendingPayments = paymentsData.filter(
-        (p: PaymentData) => p.status === 'PENDING' || p.status === 'PROCESSING'
+        (p: PaymentData) => p.status === PaymentStatus.PENDING || p.status === PaymentStatus.PROCESSING
       ).length;
 
       const thisMonthRevenue = paymentsData
         .filter((p: PaymentData) =>
-          p.status === 'APPROVED' &&
+          p.status === PaymentStatus.APPROVED &&
           p.paidAt &&
           new Date(p.paidAt) >= firstDayOfMonth
         )
@@ -326,7 +328,7 @@ export default function AdminPaymentsPage() {
   };
 
   const handleInitiateRefund = (payment: PaymentData) => {
-    if (payment.status !== 'APPROVED') {
+    if (payment.status !== PaymentStatus.APPROVED) {
       toast.warning('Solo se pueden reembolsar pagos aprobados');
       return;
     }
@@ -370,36 +372,16 @@ export default function AdminPaymentsPage() {
     }
   };
 
-  const getPaymentStatusBadge = (status: string) => {
-    switch (status) {
-      case 'APPROVED':
-        return <Badge variant="success">Aprobado</Badge>;
-      case 'PENDING':
-        return <Badge variant="warning">Pendiente</Badge>;
-      case 'PROCESSING':
-        return <Badge variant="default">Procesando</Badge>;
-      case 'REJECTED':
-        return <Badge variant="hot">Rechazado</Badge>;
-      case 'REFUNDED':
-        return <Badge variant="default">Reembolsado</Badge>;
-      default:
-        return <Badge variant="default">{status}</Badge>;
-    }
-  };
+  const getPaymentStatusBadge = getPaymentStatusBadgeShared;
 
   const getPaymentMethodLabel = (method: string) => {
-    switch (method) {
-      case 'ONLINE_MERCADOPAGO':
-        return 'MercadoPago Online';
-      case 'IN_PERSON_CASH':
-        return 'Efectivo';
-      case 'IN_PERSON_CARD':
-        return 'Tarjeta (Presencial)';
-      case 'BANK_TRANSFER':
-        return 'Transferencia Bancaria';
-      default:
-        return method;
-    }
+    const labels: Record<string, string> = {
+      [PaymentMethod.ONLINE_MERCADOPAGO]: 'MercadoPago Online',
+      [PaymentMethod.IN_PERSON_CASH]: 'Efectivo',
+      [PaymentMethod.IN_PERSON_CARD]: 'Tarjeta (Presencial)',
+      [PaymentMethod.BANK_TRANSFER]: 'Transferencia Bancaria',
+    };
+    return labels[method] ?? method;
   };
 
   const getPackageTypeLabel = (type: string) => {
@@ -793,10 +775,10 @@ export default function AdminPaymentsPage() {
                     }}
                     options={[
                       { value: '', label: 'Todos los estados' },
-                      { value: 'APPROVED', label: 'Aprobado' },
-                      { value: 'PENDING', label: 'Pendiente' },
-                      { value: 'PROCESSING', label: 'Procesando' },
-                      { value: 'REJECTED', label: 'Rechazado' },
+                      { value: PaymentStatus.APPROVED, label: 'Aprobado' },
+                      { value: PaymentStatus.PENDING, label: 'Pendiente' },
+                      { value: PaymentStatus.PROCESSING, label: 'Procesando' },
+                      { value: PaymentStatus.REJECTED, label: 'Rechazado' },
                       { value: 'REFUNDED', label: 'Reembolsado' },
                     ]}
                     placeholder="Seleccionar estado"
@@ -941,7 +923,7 @@ export default function AdminPaymentsPage() {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right">
                               <div className="flex items-center justify-end gap-2">
-                                {payment.status === 'APPROVED' && (
+                                {payment.status === PaymentStatus.APPROVED && (
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -1052,7 +1034,7 @@ export default function AdminPaymentsPage() {
                 </div>
               </div>
 
-              {selectedPayment.status === 'APPROVED' && (
+              {selectedPayment.status === PaymentStatus.APPROVED && (
                 <div className="border-t border-[hsl(var(--border-default))] pt-4">
                   <Button
                     variant="hot"

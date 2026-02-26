@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import api from '../../../lib/api-client';
+import { PackageStatus } from '../../../lib/api';
+import { getPackageStatusLabel } from '../../../lib/utils/status-badges';
 import { Card, Button, Badge, Skeleton, SkeletonCard } from '../../../components/ui';
 import { AdminLayout, AdminPageHeader, ConsoleMetric } from '../../../components/admin';
 import {
@@ -612,13 +614,7 @@ export default function AdminReportsPage() {
                     >
                       <p className="text-2xl font-bold">{status._count || 0}</p>
                       <p className="text-sm text-secondary">
-                        {status.status === 'ACTIVE'
-                          ? 'Activos'
-                          : status.status === 'EXPIRED'
-                            ? 'Expirados'
-                            : status.status === 'DEPLETED'
-                              ? 'Agotados'
-                              : status.status}
+                        {getPackageStatusLabel(status.status)}
                       </p>
                     </div>
                   ))}

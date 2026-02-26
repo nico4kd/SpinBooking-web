@@ -5,7 +5,10 @@ import { useAuth } from '../../../context/auth-context';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '../../../lib/api-client';
+import { ClassStatus } from '../../../lib/api';
+import { getClassStatusBadge } from '../../../lib/utils/status-badges';
 import { Card, Button, Badge, TimePicker, SkeletonTable, IntensityRing } from '../../../components/ui';
+import { getDifficultyBadge } from '../../../lib/utils/difficulty';
 import { AdminLayout, AdminPageHeader, ZoneBar } from '../../../components/admin';
 import {
   Users,
@@ -328,35 +331,7 @@ export default function AdminClassesPage() {
     }));
   };
 
-  const getDifficultyBadge = (level: string) => {
-    switch (level) {
-      case 'BEGINNER':
-        return <Badge variant="success">Principiante</Badge>;
-      case 'INTERMEDIATE':
-        return <Badge variant="primary">Intermedio</Badge>;
-      case 'ADVANCED':
-        return <Badge variant="hot">Avanzado</Badge>;
-      case 'ALL_LEVELS':
-        return <Badge variant="default">Todos</Badge>;
-      default:
-        return <Badge variant="default">{level}</Badge>;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'SCHEDULED':
-        return <Badge variant="success">Programada</Badge>;
-      case 'IN_PROGRESS':
-        return <Badge variant="primary">En Curso</Badge>;
-      case 'COMPLETED':
-        return <Badge variant="default">Completada</Badge>;
-      case 'CANCELLED':
-        return <Badge variant="warning">Cancelada</Badge>;
-      default:
-        return <Badge variant="default">{status}</Badge>;
-    }
-  };
+  const getStatusBadge = getClassStatusBadge;
 
   const formatDateTime = (dateString: string) => {
     return new Date(dateString).toLocaleString('es-ES', {
@@ -644,7 +619,7 @@ export default function AdminClassesPage() {
                                   <Eye className="w-3 h-3 mr-1" />
                                   Ver
                                 </Button>
-                                {classData.status === 'SCHEDULED' && (
+                                {classData.status === ClassStatus.SCHEDULED && (
                                   <Button
                                     variant="outline"
                                     size="sm"

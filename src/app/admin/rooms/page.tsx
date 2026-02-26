@@ -5,6 +5,8 @@ import { useAuth } from '../../../context/auth-context';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '../../../lib/api-client';
+import { getRoomStatusBadge } from '../../../lib/utils/status-badges';
+import { RoomStatus } from '@spinbooking/types';
 import { Button, Badge, Card } from '../../../components/ui';
 import { AdminLayout, AdminPageHeader, ConsoleMetric, ZoneBar } from '../../../components/admin';
 import { SkeletonCard } from '../../../components/ui';
@@ -76,7 +78,7 @@ export default function AdminRoomsPage() {
     name: '',
     location: '',
     capacity: 30,
-    status: 'ACTIVE',
+    status: RoomStatus.ACTIVE as string,
   });
 
   useEffect(() => {
@@ -281,43 +283,28 @@ export default function AdminRoomsPage() {
       name: '',
       location: '',
       capacity: 30,
-      status: 'ACTIVE',
+      status: RoomStatus.ACTIVE as string,
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return <Badge variant="success">Activa</Badge>;
-      case 'MAINTENANCE':
-        return <Badge variant="warning">Mantenimiento</Badge>;
-      case 'INACTIVE':
-        return <Badge variant="default">Inactiva</Badge>;
-      default:
-        return <Badge variant="default">{status}</Badge>;
-    }
-  };
+  const getStatusBadge = getRoomStatusBadge;
 
   const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'ACTIVE':
-        return 'Activa';
-      case 'MAINTENANCE':
-        return 'Mantenimiento';
-      case 'INACTIVE':
-        return 'Inactiva';
-      default:
-        return status;
-    }
+    const labels: Record<string, string> = {
+      [RoomStatus.ACTIVE]: 'Activa',
+      [RoomStatus.MAINTENANCE]: 'Mantenimiento',
+      [RoomStatus.INACTIVE]: 'Inactiva',
+    };
+    return labels[status] ?? status;
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'ACTIVE':
+      case RoomStatus.ACTIVE:
         return <CheckCircle className="h-5 w-5 text-green-500" />;
-      case 'MAINTENANCE':
+      case RoomStatus.MAINTENANCE:
         return <Wrench className="h-5 w-5 text-orange-500" />;
-      case 'INACTIVE':
+      case RoomStatus.INACTIVE:
         return <Ban className="h-5 w-5 text-gray-400" />;
       default:
         return <AlertCircle className="h-5 w-5 text-gray-400" />;
@@ -335,7 +322,7 @@ export default function AdminRoomsPage() {
     );
   }
 
-  const activeRooms = rooms.filter((r) => r.status === 'ACTIVE').length;
+  const activeRooms = rooms.filter((r) => r.status === RoomStatus.ACTIVE).length;
 
   return (
     <AdminLayout>
@@ -514,9 +501,9 @@ export default function AdminRoomsPage() {
                   </div>
 
                   {/* Status Change Buttons */}
-                  {room.status !== 'ACTIVE' && (
+                  {room.status !== RoomStatus.ACTIVE && (
                     <Button
-                      onClick={() => handleChangeStatus(room.id, 'ACTIVE')}
+                      onClick={() => handleChangeStatus(room.id, RoomStatus.ACTIVE)}
                       variant="outline"
                       size="sm"
                       className="w-full mt-2 text-green-600 hover:bg-green-50"
@@ -526,9 +513,9 @@ export default function AdminRoomsPage() {
                       Activar
                     </Button>
                   )}
-                  {room.status === 'ACTIVE' && (
+                  {room.status === RoomStatus.ACTIVE && (
                     <Button
-                      onClick={() => handleChangeStatus(room.id, 'MAINTENANCE')}
+                      onClick={() => handleChangeStatus(room.id, RoomStatus.MAINTENANCE)}
                       variant="outline"
                       size="sm"
                       className="w-full mt-2 text-orange-600 hover:bg-orange-50"

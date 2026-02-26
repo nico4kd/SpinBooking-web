@@ -4,7 +4,6 @@ import React from 'react';
 import { Clock } from 'lucide-react';
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import { useNotifications } from '../../hooks/useNotifications';
-import { useNotificationStream } from '../../hooks/useNotificationStream';
 import { useAuth } from '../../context/auth-context';
 
 interface PageHeaderProps {
@@ -23,18 +22,11 @@ export function PageHeader({
   showNotifications = true,
 }: PageHeaderProps) {
   const { isAuthenticated } = useAuth();
-  const { notifications, markAsRead, markAllAsRead, dismiss, addNotification } = useNotifications();
-
-  // Open WebSocket stream for real-time notification delivery.
-  // PageHeader owns the bell state — it manages addNotification.
-  // onNewPackageActivated fires a CustomEvent so any mounted page (e.g. dashboard)
-  // can react without opening a second WebSocket connection.
-  useNotificationStream({
-    onNewNotification: addNotification,
+  const { notifications, markAsRead, markAllAsRead, dismiss } = useNotifications({
+    wsEnabled: isAuthenticated,
     onNewPackageActivated: () => {
       window.dispatchEvent(new CustomEvent('spinbooking:package-activated'));
     },
-    enabled: isAuthenticated,
   });
 
   const formatDate = () => {
@@ -54,9 +46,8 @@ export function PageHeader({
     message: n.message,
     createdAt: n.createdAt,
     read: !!n.readAt,
-    // Map notification types to actions if needed
-    actionLabel: n.data?.actionLabel,
-    onAction: n.data?.onAction,
+    actionLabel: n.data?.actionLabel as string | undefined,
+    onAction: n.data?.onAction as (() => void) | undefined,
   }));
 
   return (

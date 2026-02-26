@@ -3,7 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../context/auth-context';
-import api from '../../lib/api-client';
+import { bookingsApi } from '../../lib/api';
+import type { Booking, PaginatedResponse } from '../../lib/api';
+import { BookingStatus } from '../../lib/api';
+import { getDifficultyLabel } from '../../lib/utils/difficulty';
+import { getBookingStatusBadge } from '../../lib/utils/status-badges';
 import { Card, Button, Badge } from '../../components/ui';
 import { AppLayout, PageHeader } from '../../components/Layout';
 import { toast } from '../../lib/toast';
@@ -17,66 +21,16 @@ import {
   AlertCircle,
   RefreshCw,
   CheckCircle2,
-  UserX,
   Calendar as CalendarIcon,
   TrendingUp,
   Package,
   AlertTriangle,
 } from 'lucide-react';
-import type { Booking as BaseBooking } from '@spinbooking/types';
-
-// Extend base booking with API-populated relations and computed fields
-interface BookingWithDetails extends Omit<BaseBooking, 'bookedAt' | 'cancelledAt' | 'createdAt' | 'updatedAt'> {
-  createdAt: string; // API returns as ISO string
-  cancelledAt: string | null;
-  // Nested relations from API
-  class: {
-    id: string;
-    title: string | null;
-    description: string | null;
-    startTime: string;
-    duration: number;
-    difficultyLevel: string;
-    room: {
-      name: string;
-      location: string | null;
-    };
-    instructor: {
-      user: {
-        firstName: string;
-        lastName: string;
-      };
-    };
-  };
-  ticket: {
-    package: {
-      type: string;
-    };
-  };
-  // Computed fields from API
-  canCancel: boolean;
-  hoursUntilClass: number;
-  cancellationDeadline: string;
-}
-
-// Generic pagination response type
-interface PaginatedResponse<T> {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
-
-type BookingsResponse = PaginatedResponse<BookingWithDetails>;
-
 type FilterType = 'all' | 'upcoming' | 'past';
 
 export default function BookingsPage() {
   const { isAuthenticated } = useAuth();
-  const [bookings, setBookings] = useState<BookingWithDetails[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>('upcoming');
@@ -92,7 +46,7 @@ export default function BookingsPage() {
     setLoadingData(true);
     setError(null);
     try {
-      const params: any = {};
+      const params: { upcoming?: boolean; past?: boolean } = {};
 
       if (filter === 'upcoming') {
         params.upcoming = true;
@@ -100,8 +54,8 @@ export default function BookingsPage() {
         params.past = true;
       }
 
-      const response = await api.get<BookingsResponse>('/bookings', { params });
-      setBookings(response.data.data);
+      const result = await bookingsApi.list(params);
+      setBookings(result.data);
     } catch (error: any) {
       console.error('Error loading bookings:', error);
       const errorMessage = error.response?.data?.message ||
@@ -119,11 +73,11 @@ export default function BookingsPage() {
 
     setCancellingId(bookingId);
     try {
-      const response = await api.delete(`/bookings/${bookingId}`);
+      const result = await bookingsApi.cancel(bookingId);
       toast.success(
         'Reserva cancelada',
         {
-          description: response.data.ticketRestored
+          description: result.ticketRestored
             ? 'Tu crédito ha sido restaurado'
             : 'El crédito no se puede restaurar (cancelación tardía)',
         }
@@ -142,55 +96,7 @@ export default function BookingsPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'CONFIRMED':
-        return (
-          <Badge variant="success">
-            <CheckCircle2 className="w-3 h-3 mr-1" />
-            Confirmada
-          </Badge>
-        );
-      case 'CANCELLED':
-        return (
-          <Badge variant="default">
-            <XCircle className="w-3 h-3 mr-1" />
-            Cancelada
-          </Badge>
-        );
-      case 'ATTENDED':
-        return (
-          <Badge variant="primary">
-            <UserCheck className="w-3 h-3 mr-1" />
-            Asistida
-          </Badge>
-        );
-      case 'NO_SHOW':
-        return (
-          <Badge variant="warning">
-            <UserX className="w-3 h-3 mr-1" />
-            No asistió
-          </Badge>
-        );
-      default:
-        return <Badge variant="default">{status}</Badge>;
-    }
-  };
-
-  const getDifficultyLabel = (level: string) => {
-    switch (level) {
-      case 'BEGINNER':
-        return 'Principiante';
-      case 'INTERMEDIATE':
-        return 'Intermedio';
-      case 'ADVANCED':
-        return 'Avanzado';
-      case 'ALL_LEVELS':
-        return 'Todos los niveles';
-      default:
-        return level;
-    }
-  };
+  const getStatusBadge = getBookingStatusBadge;
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-ES', {
@@ -248,8 +154,8 @@ export default function BookingsPage() {
 
   const stats = {
     total: bookings.length,
-    confirmed: bookings.filter((b) => b.status === 'CONFIRMED').length,
-    attended: bookings.filter((b) => b.status === 'ATTENDED').length,
+    confirmed: bookings.filter((b) => b.status === BookingStatus.CONFIRMED).length,
+    attended: bookings.filter((b) => b.status === BookingStatus.ATTENDED).length,
   };
 
   return (
@@ -435,13 +341,13 @@ export default function BookingsPage() {
                             <Package className="w-4 h-4 text-tertiary" />
                             <span className="text-secondary">Paquete:</span>
                             <span className="font-medium">
-                              {booking.ticket.package.type}
+                              {booking.ticket?.package.type}
                             </span>
                           </div>
                         </div>
 
                         {/* Cancellation Info */}
-                        {booking.status === 'CANCELLED' && booking.cancellationReason && (
+                        {booking.status === BookingStatus.CANCELLED && booking.cancellationReason && (
                           <div className="flex items-start gap-2 p-3 bg-[hsl(var(--surface-2))] rounded-[var(--radius-md)] text-sm">
                             <AlertTriangle className="w-4 h-4 text-[hsl(var(--warning))] mt-0.5" />
                             <div>
@@ -458,13 +364,13 @@ export default function BookingsPage() {
 
                       {/* Right: Actions */}
                       <div className="flex flex-col justify-between lg:w-48">
-                        {booking.status === 'CONFIRMED' && !isPast && (
+                        {booking.status === BookingStatus.CONFIRMED && !isPast && (
                           <>
                             {booking.canCancel ? (
                               <div className="space-y-2">
                                 <p className="text-xs text-secondary">
                                   Puedes cancelar hasta{' '}
-                                  {formatTime(booking.cancellationDeadline)}
+                                  {booking.cancellationDeadline && formatTime(booking.cancellationDeadline)}
                                 </p>
                                 <Button
                                   variant="outline"
@@ -498,7 +404,7 @@ export default function BookingsPage() {
                           </>
                         )}
 
-                        {booking.status === 'CONFIRMED' && isPast && (
+                        {booking.status === BookingStatus.CONFIRMED && isPast && (
                           <div className="text-sm text-tertiary">
                             Clase finalizada
                           </div>

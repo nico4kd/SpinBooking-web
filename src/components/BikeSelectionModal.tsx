@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { X, Bike, User as InstructorIcon } from 'lucide-react';
 import { Button, Card } from './ui';
-import apiClient from '../lib/api-client';
+import { classesApi } from '../lib/api';
+import type { BikeData } from '../lib/api/classes';
 
 interface BikeSelectionModalProps {
   classId: string;
@@ -11,16 +12,6 @@ interface BikeSelectionModalProps {
   onSelect: (bikeNumber: number | null) => void;
   onClose: () => void;
   isOpen: boolean;
-}
-
-interface BikeData {
-  classId: string;
-  maxCapacity: number;
-  occupiedBikes: number[];
-  availableBikes: number[];
-  totalOccupied: number;
-  totalAvailable: number;
-  popularBikes?: number[]; // Most requested bike numbers
 }
 
 export default function BikeSelectionModal({
@@ -43,10 +34,8 @@ export default function BikeSelectionModal({
   const loadBikeData = async () => {
     setLoading(true);
     try {
-      const response = await apiClient.get<BikeData>(
-        `/classes/${classId}/bikes`,
-      );
-      setBikeData(response.data);
+      const data = await classesApi.getBikeData(classId);
+      setBikeData(data);
     } catch (error) {
       console.error('Error loading bike data:', error);
     } finally {
