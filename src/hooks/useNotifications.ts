@@ -22,7 +22,7 @@ interface UseNotificationsOptions {
 }
 
 export function useNotifications(options: UseNotificationsOptions = {}) {
-  const { pollingInterval = 30000, onNewPackageActivated } = options;
+  const { pollingInterval = 60000, onNewPackageActivated } = options;
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -124,6 +124,13 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     return () => clearInterval(interval);
   }, [pollingInterval, fetchNotifications]);
 
+  // Optimistically prepend an SSE-received notification to local state.
+  // Called by useNotificationStream via the onNewNotification callback.
+  const addNotification = useCallback((notification: Notification) => {
+    setNotifications((prev) => [notification, ...prev]);
+    setUnreadCount((prev) => prev + 1);
+  }, []);
+
   return {
     notifications,
     unreadCount,
@@ -132,5 +139,6 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     markAllAsRead,
     dismiss,
     refresh: fetchNotifications,
+    addNotification,
   };
 }

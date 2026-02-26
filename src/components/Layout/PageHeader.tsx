@@ -4,6 +4,8 @@ import React from 'react';
 import { Clock } from 'lucide-react';
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useNotificationStream } from '../../hooks/useNotificationStream';
+import { useAuth } from '../../context/auth-context';
 
 interface PageHeaderProps {
   title: string;
@@ -20,7 +22,20 @@ export function PageHeader({
   showDate = false,
   showNotifications = true,
 }: PageHeaderProps) {
-  const { notifications, markAsRead, markAllAsRead, dismiss } = useNotifications();
+  const { isAuthenticated } = useAuth();
+  const { notifications, markAsRead, markAllAsRead, dismiss, addNotification } = useNotifications();
+
+  // Open SSE stream for real-time notification delivery.
+  // PageHeader owns the bell state — it manages addNotification.
+  // onNewPackageActivated fires a CustomEvent so any mounted page (e.g. dashboard)
+  // can react without opening a second SSE connection.
+  useNotificationStream({
+    onNewNotification: addNotification,
+    onNewPackageActivated: () => {
+      window.dispatchEvent(new CustomEvent('spinbooking:package-activated'));
+    },
+    enabled: isAuthenticated,
+  });
 
   const formatDate = () => {
     return new Date().toLocaleDateString('es-ES', {

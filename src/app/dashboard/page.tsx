@@ -148,7 +148,8 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calendarMonth]);
 
-  // Reactive refresh: when a package is activated, reload stats and packages
+  // Reactive refresh: when a package is activated, reload stats and packages.
+  // useNotifications handles the polling path (PACKAGE_ACTIVATED detection on poll).
   useNotifications({
     onNewPackageActivated: useCallback(() => {
       loadStats();
@@ -156,6 +157,19 @@ export default function DashboardPage() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   });
+
+  // Real-time path: PageHeader's SSE hook dispatches this event on PACKAGE_ACTIVATED.
+  // Only one SSE connection is opened (by PageHeader); dashboard reacts here without
+  // opening a second connection.
+  useEffect(() => {
+    const handler = () => {
+      loadStats();
+      loadPackages();
+    };
+    window.addEventListener('spinbooking:package-activated', handler);
+    return () => window.removeEventListener('spinbooking:package-activated', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadStats = async () => {
     try {
