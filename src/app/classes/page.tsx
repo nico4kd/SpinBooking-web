@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuth } from '../../context/auth-context';
-import { bookingsApi, classesApi, BookingStatus } from '../../lib/api';
-import type { ClassWithAvailability, Booking, PaginatedResponse } from '../../lib/api';
+import { bookingsApi, classesApi, packagesApi, usersApi, BookingStatus, PackageStatus } from '../../lib/api';
+import type { ClassWithAvailability, Booking, PaginatedResponse, UserStats, UserPackage } from '../../lib/api';
 import api from '../../lib/api-client';
 import {
   Card,
@@ -18,6 +18,7 @@ import {
 import { AppLayout, PageHeader } from '../../components/Layout';
 import { CalendarView } from '../../components/calendar/CalendarView';
 import BikeSelectionModal from '../../components/BikeSelectionModal';
+import type { BikeSelection } from '../../components/BikeSelectionModal';
 import { toast } from '../../lib/toast';
 import {
   Calendar as CalendarIcon,
@@ -43,13 +44,35 @@ export default function ClassesPage() {
   const [showBikeModal, setShowBikeModal] = useState(false);
   const [pendingClassId, setPendingClassId] = useState<string | null>(null);
   const [pendingMaxCapacity, setPendingMaxCapacity] = useState<number>(0);
+  const [pendingClassName, setPendingClassName] = useState<string>('');
+  const [pendingClassTime, setPendingClassTime] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [currentWeekDate, setCurrentWeekDate] = useState(new Date());
+  const [stats, setStats] = useState<UserStats | null>(null);
+  const [packages, setPackages] = useState<UserPackage[]>([]);
 
   // Filters
   const [startDate, setStartDate] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+
+  // Load user stats and packages once for credit check
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const loadCreditData = async () => {
+      try {
+        const [statsData, packagesData] = await Promise.all([
+          usersApi.getStats(),
+          packagesApi.getUserPackages(),
+        ]);
+        setStats(statsData);
+        setPackages(packagesData);
+      } catch (error: any) {
+        console.error('Error loading credit data:', error);
+      }
+    };
+    loadCreditData();
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -141,29 +164,72 @@ export default function ClassesPage() {
   };
 
   const handleBookClass = useCallback((classItem: ClassWithAvailability) => {
+    // Credit check before opening bike modal (mirrors dashboard logic)
+    if (stats === null || stats.availableCredits === 0) {
+      // Check if the user only has PENDING packages
+      const hasPendingOnly = packages.length > 0 && packages.every((p) => p.status === PackageStatus.PENDING);
+      if (hasPendingOnly) {
+        toast.error('Tu paquete está pendiente de confirmación.', {
+          description: 'Una vez confirmado podrás reservar clases.',
+        });
+      } else {
+        toast.error('No tenés créditos disponibles.', {
+          description: 'Comprá un paquete para reservar.',
+        });
+      }
+      return;
+    }
+
+    // Check if all non-pending packages are exhausted
+    const nonPendingPackages = packages.filter((p) => p.status !== PackageStatus.PENDING);
+    if (
+      nonPendingPackages.length > 0 &&
+      nonPendingPackages.every((p) => p.remainingTickets === 0)
+    ) {
+      const hasPending = packages.some((p) => p.status === PackageStatus.PENDING);
+      if (hasPending) {
+        toast.error('Tu paquete está pendiente de confirmación.', {
+          description: 'Una vez confirmado podrás reservar clases.',
+        });
+      } else {
+        toast.error('No tenés créditos disponibles.', {
+          description: 'Comprá un paquete para reservar.',
+        });
+      }
+      return;
+    }
+
     // Open bike selection modal
     setPendingClassId(classItem.id);
     setPendingMaxCapacity(classItem.maxCapacity);
+    setPendingClassName(classItem.title || 'Clase');
+    setPendingClassTime(formatTime(classItem.startTime));
     setShowBikeModal(true);
-  }, []);
+  }, [stats, packages]);
 
-  const handleBikeSelected = useCallback(async (bikeNumber: number | null) => {
+  const handleBikeSelected = useCallback(async (selection: BikeSelection) => {
     if (!pendingClassId) return;
+
+    const { bikeNumber, bikeSize } = selection;
 
     setBookingClass(pendingClassId);
     try {
       await bookingsApi.create({
         classId: pendingClassId,
-        bikeNumber,
+        ...(bikeNumber !== undefined && { bikeNumber }),
+        bikeSize,
       });
+
+      let description = 'Tu bicicleta será asignada automáticamente';
+      if (bikeNumber) {
+        description = `Bicicleta #${bikeNumber} asignada`;
+      } else if (bikeSize) {
+        description = `Se asignará una bicicleta talle ${bikeSize}`;
+      }
 
       toast.success(
         '¡Reserva realizada exitosamente!',
-        {
-          description: bikeNumber
-            ? `Bicicleta #${bikeNumber} asignada`
-            : 'Tu bicicleta será asignada automáticamente',
-        }
+        { description }
       );
       loadClasses(); // Reload to update availability
     } catch (error: any) {
@@ -178,6 +244,8 @@ export default function ClassesPage() {
       setBookingClass(null);
       setPendingClassId(null);
       setPendingMaxCapacity(0);
+      setPendingClassName('');
+      setPendingClassTime('');
     }
   }, [pendingClassId]);
 
@@ -558,8 +626,12 @@ export default function ClassesPage() {
             setShowBikeModal(false);
             setPendingClassId(null);
             setPendingMaxCapacity(0);
+            setPendingClassName('');
+            setPendingClassTime('');
           }}
           isOpen={showBikeModal}
+          className={pendingClassName}
+          classTime={pendingClassTime}
         />
       )}
     </AppLayout>

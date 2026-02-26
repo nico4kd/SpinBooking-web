@@ -22,6 +22,7 @@ import {
   Menu,
   X,
   Settings2,
+  Bike,
 } from 'lucide-react';
 
 interface NavItem {
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
   // STUDIO - Physical resources
   { href: '/admin/instructors', label: 'Instructores', icon: UserCog, zone: 'studio' },
   { href: '/admin/rooms', label: 'Salas', icon: MapPin, zone: 'studio' },
+  { href: '/admin/rooms/bikes', label: 'Bicicletas', icon: Bike, zone: 'studio' },
   { href: '/admin/payments', label: 'Pagos', icon: CreditCard, zone: 'studio' },
   { href: '/admin/settings', label: 'Configuración', icon: Settings2, zone: 'studio' },
 

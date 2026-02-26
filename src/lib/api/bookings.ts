@@ -19,7 +19,7 @@ export const bookingsApi = {
   getById: (id: string) =>
     api.get<Booking>(`/bookings/${id}`).then((r) => r.data),
 
-  create: (data: { classId: string; bikeNumber?: number | null }) =>
+  create: (data: { classId: string; bikeNumber?: number | null; bikeSize?: string }) =>
     api.post<Booking>('/bookings', data).then((r) => r.data),
 
   cancel: (id: string) =>

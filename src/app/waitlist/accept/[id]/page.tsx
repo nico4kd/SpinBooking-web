@@ -116,8 +116,8 @@ export default function WaitlistAcceptPage() {
     }
   };
 
-  const handleAcceptWithBike = (bikeNumber: number | null) => {
-    handleAccept(bikeNumber);
+  const handleAcceptWithBike = (selection: { bikeNumber?: number; bikeSize?: string }) => {
+    handleAccept(selection.bikeNumber ?? null);
   };
 
   const handleAccept = async (bikeNumber?: number | null) => {

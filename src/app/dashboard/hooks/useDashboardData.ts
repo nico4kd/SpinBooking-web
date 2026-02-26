@@ -247,8 +247,10 @@ export function useDashboardData() {
     setShowBikeModal(true);
   };
 
-  const handleBikeSelected = async (bikeNumber: number | null) => {
+  const handleBikeSelected = async (selection: { bikeNumber?: number; bikeSize?: string }) => {
     if (!pendingClassId) return;
+
+    const { bikeNumber, bikeSize } = selection;
 
     setBookingClass(pendingClassId);
     setShowBikeModal(false);
@@ -256,7 +258,8 @@ export function useDashboardData() {
     try {
       await bookingsApi.create({
         classId: pendingClassId,
-        bikeNumber,
+        bikeNumber: bikeNumber ?? null,
+        bikeSize,
       });
       toast.success('Reserva confirmada');
       if (selectedDay) {

@@ -13,6 +13,9 @@ export { classesApi } from './classes';
 export type { ClassFilters } from './classes';
 export { packagesApi } from './packages';
 export { notificationsApi } from './notifications';
+export { systemConfigApi } from './system-config';
+export { bikesApi } from './bikes';
+export type { BikeRecord, UpdateBikePayload, BulkUpdatePayload } from './bikes';
 
 // Re-export enums for type-safe status comparisons
 export {

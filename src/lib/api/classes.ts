@@ -12,6 +12,19 @@ export interface ClassFilters {
   limit?: number;
 }
 
+export interface BikeInfo {
+  number: number;
+  size: string;
+  status: string;
+  isOccupied: boolean;
+}
+
+export interface SizeAvailability {
+  size: string;
+  available: number;
+  total: number;
+}
+
 export interface BikeData {
   classId: string;
   maxCapacity: number;
@@ -20,6 +33,8 @@ export interface BikeData {
   totalOccupied: number;
   totalAvailable: number;
   popularBikes?: number[];
+  bikes?: BikeInfo[];
+  sizeAvailability?: SizeAvailability[];
 }
 
 export const classesApi = {

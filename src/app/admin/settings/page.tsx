@@ -5,7 +5,7 @@ import { useAuth } from '../../../context/auth-context';
 import api from '../../../lib/api-client';
 import { Card, Button } from '../../../components/ui';
 import { AdminLayout, AdminPageHeader } from '../../../components/admin';
-import { SlidersHorizontal, Save, RefreshCw, AlertCircle, CheckCircle2, Building2, ListChecks } from 'lucide-react';
+import { SlidersHorizontal, Save, RefreshCw, AlertCircle, CheckCircle2, Building2, ListChecks, Clock } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 
 interface SystemConfigEntry {
@@ -38,6 +38,7 @@ export default function AdminSettingsPage() {
     bank_alias_holder: '',
     bank_alias_bank: '',
     waitlist_enabled: 'false',
+    cancellation_deadline_hours: '1',
   });
   const [originalConfigs, setOriginalConfigs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -62,6 +63,7 @@ export default function AdminSettingsPage() {
         bank_alias_holder: '',
         bank_alias_bank: '',
         waitlist_enabled: 'false',
+        cancellation_deadline_hours: '1',
       };
       for (const entry of entries) {
         if (entry.key in mapped) {
@@ -114,6 +116,42 @@ export default function AdminSettingsPage() {
       setOriginalConfigs((prev) => ({ ...prev, waitlist_enabled: newValue }));
       toast.success(enabled ? 'Lista de espera habilitada' : 'Lista de espera deshabilitada');
     } catch (err: any) {
+      toast.error('Error al guardar', {
+        description: err.response?.data?.message || 'Por favor intenta nuevamente',
+      });
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const [deadlineError, setDeadlineError] = useState<string | null>(null);
+
+  const handleDeadlineSave = async () => {
+    const raw = configs.cancellation_deadline_hours.trim();
+    const parsed = parseFloat(raw);
+
+    if (isNaN(parsed) || raw === '') {
+      setDeadlineError('El valor debe ser un numero valido');
+      return;
+    }
+    if (parsed <= 0) {
+      setDeadlineError('El valor debe ser mayor a 0');
+      return;
+    }
+
+    setDeadlineError(null);
+    setSaving('cancellation_deadline_hours');
+    try {
+      await api.put('/system-config/cancellation_deadline_hours', {
+        value: String(parsed),
+        label: 'Plazo de cancelacion (horas)',
+      });
+      setOriginalConfigs((prev) => ({ ...prev, cancellation_deadline_hours: String(parsed) }));
+      setConfigs((prev) => ({ ...prev, cancellation_deadline_hours: String(parsed) }));
+      toast.success('Plazo de cancelacion actualizado');
+    } catch (err: any) {
+      // Revert to previous value on failure
+      setConfigs((prev) => ({ ...prev, cancellation_deadline_hours: originalConfigs.cancellation_deadline_hours }));
       toast.error('Error al guardar', {
         description: err.response?.data?.message || 'Por favor intenta nuevamente',
       });
@@ -281,6 +319,69 @@ export default function AdminSettingsPage() {
                     )}
                   </p>
                 </div>
+              </div>
+            </Card>
+
+            {/* Cancellation Deadline Section */}
+            <Card variant="elevated">
+              <div className="flex items-start gap-4 mb-6">
+                <div className="w-10 h-10 rounded-[var(--radius-sm)] bg-[hsl(var(--primary)/0.15)] flex items-center justify-center flex-shrink-0">
+                  <Clock className="w-5 h-5 text-[hsl(var(--primary))]" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="font-semibold">Plazo de cancelacion</h2>
+                  <p className="text-sm text-secondary mt-0.5">
+                    Horas antes de la clase dentro de las cuales el miembro no puede cancelar sin perder su credito.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-end gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium mb-1.5">
+                    Plazo de cancelacion (horas)
+                    <span className="text-[hsl(var(--error))] ml-1">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0.1"
+                    value={configs.cancellation_deadline_hours}
+                    onChange={(e) => {
+                      setDeadlineError(null);
+                      setConfigs((prev) => ({ ...prev, cancellation_deadline_hours: e.target.value }));
+                    }}
+                    placeholder="1"
+                    className={`w-full px-3 py-2 rounded-[var(--radius-md)] border ${
+                      deadlineError
+                        ? 'border-[hsl(var(--error))] focus:ring-[hsl(var(--error)/0.3)]'
+                        : 'border-[hsl(var(--border-default))] focus:ring-[hsl(var(--primary)/0.3)]'
+                    } bg-[hsl(var(--surface-0))] text-sm focus:outline-none focus:ring-2`}
+                  />
+                  {deadlineError ? (
+                    <p className="text-xs text-[hsl(var(--error))] mt-1">{deadlineError}</p>
+                  ) : (
+                    <p className="text-xs text-tertiary mt-1">
+                      Acepta valores decimales (ej: 0.5 = 30 minutos, 1.5 = 1 hora y 30 minutos)
+                    </p>
+                  )}
+                </div>
+                <Button
+                  variant={isDirty('cancellation_deadline_hours') ? 'primary' : 'outline'}
+                  size="sm"
+                  disabled={saving !== null || !isDirty('cancellation_deadline_hours')}
+                  onClick={handleDeadlineSave}
+                  className="flex-shrink-0"
+                >
+                  {saving === 'cancellation_deadline_hours' ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-1.5" />
+                      Guardar
+                    </>
+                  )}
+                </Button>
               </div>
             </Card>
 

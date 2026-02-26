@@ -32,6 +32,7 @@ import {
   LogOut,
   Search,
   Filter,
+  Bike,
 } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 
@@ -499,6 +500,15 @@ export default function AdminRoomsPage() {
                       )}
                     </Button>
                   </div>
+
+                  {/* Bike Management Link */}
+                  <Link
+                    href={`/admin/rooms/bikes?roomId=${room.id}`}
+                    className="w-full mt-2 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md border border-gray-300 text-primary hover:bg-primary/5 transition-colors"
+                  >
+                    <Bike className="h-4 w-4" />
+                    Gestionar Bicicletas
+                  </Link>
 
                   {/* Status Change Buttons */}
                   {room.status !== RoomStatus.ACTIVE && (

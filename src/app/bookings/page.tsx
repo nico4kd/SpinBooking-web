@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../context/auth-context';
-import { bookingsApi } from '../../lib/api';
+import { bookingsApi, systemConfigApi } from '../../lib/api';
 import type { Booking, PaginatedResponse } from '../../lib/api';
 import { BookingStatus } from '../../lib/api';
 import { getDifficultyLabel } from '../../lib/utils/difficulty';
@@ -35,12 +35,19 @@ export default function BookingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>('upcoming');
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancellationDeadlineHours, setCancellationDeadlineHours] = useState<number | null>(null);
 
   useEffect(() => {
     if (isAuthenticated) {
       loadBookings();
     }
   }, [isAuthenticated, filter]);
+
+  useEffect(() => {
+    systemConfigApi.getCancellationDeadline()
+      .then((data) => setCancellationDeadlineHours(data.hours))
+      .catch(() => setCancellationDeadlineHours(null));
+  }, []);
 
   const loadBookings = async () => {
     setLoadingData(true);
@@ -397,7 +404,7 @@ export default function BookingsPage() {
                               <div className="flex items-start gap-2 p-3 bg-[hsl(var(--warning)/0.1)] rounded-[var(--radius-md)] text-sm">
                                 <AlertTriangle className="w-4 h-4 text-[hsl(var(--warning))] mt-0.5" />
                                 <p className="text-secondary">
-                                  Ya no se puede cancelar (menos de 2 horas)
+                                  Ya no se puede cancelar (menos de {cancellationDeadlineHours ?? 1} hora{(cancellationDeadlineHours ?? 1) !== 1 ? 's' : ''})
                                 </p>
                               </div>
                             )}
