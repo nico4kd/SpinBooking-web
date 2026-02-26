@@ -1,79 +1,94 @@
 /**
  * Unit tests for useNotificationStream hook
  *
- * These tests mock the global EventSource to avoid real network connections.
+ * These tests mock socket.io-client to avoid real network connections.
  *
  * Covers:
- * - 5.4 Exponential backoff — sseAvailable becomes false after 3 consecutive errors
- * - 5.5 onNewPackageActivated called only for PACKAGE_ACTIVATED type
- * - 5.6 Deduplication via seenIds
+ * - 7.3 Socket connection lifecycle (connect on mount, disconnect on unmount)
+ * - 7.3 Notification event handling via socket.io-client
+ * - 7.3 onNewPackageActivated called only for PACKAGE_ACTIVATED type
+ * - 7.3 Deduplication via seenIds
+ * - 7.3 wsAvailable becomes false after max connect_error events
+ * - 7.3 enabled=false prevents connection
  *
- * Ref: [N-Backoff-2, UI-Credits-2, N-Dedup-1, UI-Bell-2] | Tasks: 5.4, 5.5, 5.6
+ * Ref: [WS-Hook-1, WS-Hook-2, WS-Dedup-1, WS-Fallback-1] | Tasks: 7.3
  */
 
 import { renderHook, act } from '@testing-library/react';
 import { useNotificationStream } from './useNotificationStream';
 
-// ─── EventSource Mock ────────────────────────────────────────────────────────
+// ─── socket.io-client Mock ──────────────────────────────────────────────────
 
-/**
- * Minimal EventSource mock that exposes handler references so tests can
- * trigger onopen / onmessage / onerror programmatically.
- */
-class MockEventSource {
-  static CONNECTING = 0;
-  static OPEN = 1;
-  static CLOSED = 2;
+type SocketEventHandler = (...args: any[]) => void;
 
-  readyState = MockEventSource.CONNECTING;
-  url: string;
-
-  onopen: ((event: Event) => void) | null = null;
-  onmessage: ((event: MessageEvent) => void) | null = null;
-  onerror: ((event: Event) => void) | null = null;
-
-  // Track all instances created during a test
-  static instances: MockEventSource[] = [];
-
-  constructor(url: string) {
-    this.url = url;
-    MockEventSource.instances.push(this);
-  }
-
-  close() {
-    this.readyState = MockEventSource.CLOSED;
-  }
-
-  // Helpers for test code to simulate events
-  simulateOpen() {
-    this.readyState = MockEventSource.OPEN;
-    this.onopen?.(new Event('open'));
-  }
-
-  simulateMessage(data: object | string) {
-    const serialized = typeof data === 'string' ? data : JSON.stringify(data);
-    this.onmessage?.(new MessageEvent('message', { data: serialized }));
-  }
-
-  simulateError() {
-    this.readyState = MockEventSource.CLOSED;
-    this.onerror?.(new Event('error'));
-  }
+interface MockSocket {
+  on: jest.Mock;
+  io: { on: jest.Mock };
+  disconnect: jest.Mock;
+  connected: boolean;
+  auth: Record<string, any>;
+  _handlers: Record<string, SocketEventHandler[]>;
+  _ioHandlers: Record<string, SocketEventHandler[]>;
+  simulateEvent: (event: string, ...args: any[]) => void;
+  simulateIoEvent: (event: string, ...args: any[]) => void;
 }
+
+let mockSocketInstances: MockSocket[] = [];
+
+function createMockSocket(): MockSocket {
+  const handlers: Record<string, SocketEventHandler[]> = {};
+  const ioHandlers: Record<string, SocketEventHandler[]> = {};
+
+  const socket: MockSocket = {
+    on: jest.fn((event: string, handler: SocketEventHandler) => {
+      if (!handlers[event]) handlers[event] = [];
+      handlers[event].push(handler);
+      return socket;
+    }),
+    io: {
+      on: jest.fn((event: string, handler: SocketEventHandler) => {
+        if (!ioHandlers[event]) ioHandlers[event] = [];
+        ioHandlers[event].push(handler);
+        return socket.io;
+      }),
+    },
+    disconnect: jest.fn(),
+    connected: false,
+    auth: {},
+    _handlers: handlers,
+    _ioHandlers: ioHandlers,
+    simulateEvent(event: string, ...args: any[]) {
+      const fns = handlers[event] || [];
+      fns.forEach((fn) => fn(...args));
+    },
+    simulateIoEvent(event: string, ...args: any[]) {
+      const fns = ioHandlers[event] || [];
+      fns.forEach((fn) => fn(...args));
+    },
+  };
+
+  mockSocketInstances.push(socket);
+  return socket;
+}
+
+// Mock the socket.io-client module
+jest.mock('socket.io-client', () => ({
+  io: jest.fn(() => createMockSocket()),
+}));
+
+// Import the mocked io for assertions
+import { io as mockIo } from 'socket.io-client';
 
 // ─── Test Setup ──────────────────────────────────────────────────────────────
 
-// Save real EventSource (may be undefined in jsdom)
-const OriginalEventSource = (global as any).EventSource;
-
 beforeEach(() => {
-  jest.useFakeTimers();
-  MockEventSource.instances = [];
-  (global as any).EventSource = MockEventSource;
+  mockSocketInstances = [];
+  (mockIo as jest.Mock).mockClear();
+  (mockIo as jest.Mock).mockImplementation(() => createMockSocket());
 
   // Provide a fake access token so the hook does not bail out
   Storage.prototype.getItem = jest.fn((key: string) =>
-    key === 'accessToken' ? 'fake-token' : null,
+    key === 'accessToken' ? 'fake-jwt-token' : null,
   );
 
   // Ensure NEXT_PUBLIC_API_URL is set
@@ -81,138 +96,129 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  jest.runAllTimers();
-  jest.useRealTimers();
-  (global as any).EventSource = OriginalEventSource;
   jest.restoreAllMocks();
 });
 
-// ─── Helper: get the latest EventSource instance ─────────────────────────────
+// ─── Helper ──────────────────────────────────────────────────────────────────
 
-function latestEs(): MockEventSource {
-  const instances = MockEventSource.instances;
-  expect(instances.length).toBeGreaterThan(0);
-  return instances[instances.length - 1];
+function latestSocket(): MockSocket {
+  expect(mockSocketInstances.length).toBeGreaterThan(0);
+  return mockSocketInstances[mockSocketInstances.length - 1];
 }
 
-// ─── 5.4 Exponential backoff and fallback ─────────────────────────────────────
+// ─── Connection lifecycle ────────────────────────────────────────────────────
 
-describe('useNotificationStream — exponential backoff (task 5.4)', () => {
-  it('sseAvailable becomes false after 3 consecutive onerror events', async () => {
-    const onNewNotification = jest.fn();
-
-    const { result } = renderHook(() =>
-      useNotificationStream({ onNewNotification }),
+describe('useNotificationStream -- connection lifecycle (task 7.3)', () => {
+  it('creates a socket.io connection on mount with auth token', () => {
+    renderHook(() =>
+      useNotificationStream({ onNewNotification: jest.fn() }),
     );
 
-    // Initial state: sseAvailable is true
-    expect(result.current.sseAvailable).toBe(true);
-
-    // --- Error 1 (retryCount becomes 1, delay = 2^0 * 1000 = 1000 ms) ---
-    act(() => {
-      latestEs().simulateError();
-    });
-
-    // Advance past the 1 s retry delay — new EventSource is created
-    act(() => {
-      jest.advanceTimersByTime(1000);
-    });
-
-    expect(result.current.sseAvailable).toBe(true);
-    expect(MockEventSource.instances).toHaveLength(2);
-
-    // --- Error 2 (retryCount becomes 2, delay = 2^1 * 1000 = 2000 ms) ---
-    act(() => {
-      latestEs().simulateError();
-    });
-
-    act(() => {
-      jest.advanceTimersByTime(2000);
-    });
-
-    expect(result.current.sseAvailable).toBe(true);
-    expect(MockEventSource.instances).toHaveLength(3);
-
-    // --- Error 3 (retryCount becomes 3, delay = 2^2 * 1000 = 4000 ms) ---
-    act(() => {
-      latestEs().simulateError();
-    });
-
-    act(() => {
-      jest.advanceTimersByTime(4000);
-    });
-
-    expect(result.current.sseAvailable).toBe(true);
-    expect(MockEventSource.instances).toHaveLength(4);
-
-    // --- Error 4 (retryCount > 3 — no more reconnects, sseAvailable = false) ---
-    act(() => {
-      latestEs().simulateError();
-    });
-
-    // After the 4th error (3 retries exhausted), sseAvailable should be false
-    expect(result.current.sseAvailable).toBe(false);
+    expect(mockIo).toHaveBeenCalledTimes(1);
+    expect(mockIo).toHaveBeenCalledWith(
+      'http://localhost:3000/notifications',
+      expect.objectContaining({
+        auth: { token: 'fake-jwt-token' },
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+      }),
+    );
   });
 
-  it('does NOT create a 5th EventSource after sseAvailable becomes false', async () => {
+  it('sets connected to true when the socket connects', () => {
     const { result } = renderHook(() =>
       useNotificationStream({ onNewNotification: jest.fn() }),
     );
 
-    // Exhaust 3 retries
-    for (let i = 0; i < 3; i++) {
-      act(() => { latestEs().simulateError(); });
-      act(() => { jest.advanceTimersByTime(Math.pow(2, i) * 1000); });
-    }
+    expect(result.current.connected).toBe(false);
 
-    // 4th error → sseAvailable = false
-    act(() => { latestEs().simulateError(); });
-    expect(result.current.sseAvailable).toBe(false);
-
-    const countAfterExhaustion = MockEventSource.instances.length;
-
-    // Advance timers significantly — no new connection should be created
-    act(() => { jest.advanceTimersByTime(60000); });
-
-    expect(MockEventSource.instances.length).toBe(countAfterExhaustion);
-  });
-
-  it('resets retryCount on a successful onopen, so subsequent errors start fresh', async () => {
-    const { result } = renderHook(() =>
-      useNotificationStream({ onNewNotification: jest.fn() }),
-    );
-
-    // Error 1 → retry
-    act(() => { latestEs().simulateError(); });
-    act(() => { jest.advanceTimersByTime(1000); });
-
-    // Successful connect resets counter
-    act(() => { latestEs().simulateOpen(); });
+    act(() => {
+      latestSocket().simulateEvent('connect');
+    });
 
     expect(result.current.connected).toBe(true);
-    expect(result.current.sseAvailable).toBe(true);
+  });
 
-    // Now produce 3 fresh errors — sseAvailable should become false
-    for (let i = 0; i < 3; i++) {
-      act(() => { latestEs().simulateError(); });
-      act(() => { jest.advanceTimersByTime(Math.pow(2, i) * 1000); });
-    }
+  it('sets connected to false when the socket disconnects', () => {
+    const { result } = renderHook(() =>
+      useNotificationStream({ onNewNotification: jest.fn() }),
+    );
 
-    act(() => { latestEs().simulateError(); });
-    expect(result.current.sseAvailable).toBe(false);
+    act(() => {
+      latestSocket().simulateEvent('connect');
+    });
+    expect(result.current.connected).toBe(true);
+
+    act(() => {
+      latestSocket().simulateEvent('disconnect');
+    });
+    expect(result.current.connected).toBe(false);
+  });
+
+  it('disconnects the socket on unmount', () => {
+    const { unmount } = renderHook(() =>
+      useNotificationStream({ onNewNotification: jest.fn() }),
+    );
+
+    const socket = latestSocket();
+    unmount();
+
+    expect(socket.disconnect).toHaveBeenCalled();
+  });
+
+  it('does not create a socket when no access token is available', () => {
+    (Storage.prototype.getItem as jest.Mock).mockReturnValue(null);
+
+    renderHook(() =>
+      useNotificationStream({ onNewNotification: jest.fn() }),
+    );
+
+    expect(mockIo).not.toHaveBeenCalled();
   });
 });
 
-// ─── 5.5 onNewPackageActivated called only for PACKAGE_ACTIVATED ──────────────
+// ─── Notification event handling ─────────────────────────────────────────────
 
-describe('useNotificationStream — onNewPackageActivated filter (task 5.5)', () => {
-  const makeNotification = (type: string, id: string) => ({
+describe('useNotificationStream -- notification event handling (task 7.3)', () => {
+  const makeNotification = (type: string, id: string, data?: any) => ({
     id,
     type,
     subject: 'Test',
     message: 'Test message',
     createdAt: '2026-02-26T10:00:00Z',
     readAt: null,
+    data,
+  });
+
+  it('calls onNewNotification when a notification event is received', () => {
+    const onNewNotification = jest.fn();
+
+    renderHook(() =>
+      useNotificationStream({ onNewNotification }),
+    );
+
+    const notification = makeNotification('PACKAGE_ACTIVATED', 'n-1');
+
+    act(() => {
+      latestSocket().simulateEvent('notification', notification);
+    });
+
+    expect(onNewNotification).toHaveBeenCalledTimes(1);
+    expect(onNewNotification).toHaveBeenCalledWith(notification);
+  });
+});
+
+// ─── onNewPackageActivated filter ────────────────────────────────────────────
+
+describe('useNotificationStream -- onNewPackageActivated filter (task 7.3)', () => {
+  const makeNotification = (type: string, id: string, data?: any) => ({
+    id,
+    type,
+    subject: 'Test',
+    message: 'Test message',
+    createdAt: '2026-02-26T10:00:00Z',
+    readAt: null,
+    data,
   });
 
   it('calls onNewPackageActivated exactly once for a PACKAGE_ACTIVATED event', () => {
@@ -224,7 +230,7 @@ describe('useNotificationStream — onNewPackageActivated filter (task 5.5)', ()
     );
 
     act(() => {
-      latestEs().simulateMessage(makeNotification('PACKAGE_ACTIVATED', 'n-1'));
+      latestSocket().simulateEvent('notification', makeNotification('PACKAGE_ACTIVATED', 'n-1'));
     });
 
     expect(onNewPackageActivated).toHaveBeenCalledTimes(1);
@@ -240,7 +246,7 @@ describe('useNotificationStream — onNewPackageActivated filter (task 5.5)', ()
     );
 
     act(() => {
-      latestEs().simulateMessage(makeNotification('BOOKING_CONFIRMED', 'n-2'));
+      latestSocket().simulateEvent('notification', makeNotification('BOOKING_CONFIRMED', 'n-2'));
     });
 
     expect(onNewPackageActivated).not.toHaveBeenCalled();
@@ -256,14 +262,40 @@ describe('useNotificationStream — onNewPackageActivated filter (task 5.5)', ()
     );
 
     act(() => {
-      latestEs().simulateMessage(makeNotification('WAITLIST_SPOT_AVAILABLE', 'n-3'));
+      latestSocket().simulateEvent('notification', makeNotification('WAITLIST_SPOT_AVAILABLE', 'n-3'));
     });
 
     expect(onNewPackageActivated).not.toHaveBeenCalled();
     expect(onNewNotification).toHaveBeenCalledTimes(1);
   });
 
-  it('dispatches PACKAGE_ACTIVATED, BOOKING_CONFIRMED, and WAITLIST_SPOT_AVAILABLE — onNewPackageActivated called once, onNewNotification called 3 times', () => {
+  it('dispatches CustomEvent with credits delta for PACKAGE_ACTIVATED with newCredits', () => {
+    const onNewNotification = jest.fn();
+    const onNewPackageActivated = jest.fn();
+    const dispatchEventSpy = jest.spyOn(window, 'dispatchEvent');
+
+    renderHook(() =>
+      useNotificationStream({ onNewNotification, onNewPackageActivated }),
+    );
+
+    act(() => {
+      latestSocket().simulateEvent(
+        'notification',
+        makeNotification('PACKAGE_ACTIVATED', 'n-credits', { newCredits: 10 }),
+      );
+    });
+
+    expect(dispatchEventSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'spinbooking:credits-updated',
+        detail: { delta: 10 },
+      }),
+    );
+
+    dispatchEventSpy.mockRestore();
+  });
+
+  it('handles mixed notification types — onNewPackageActivated called once, onNewNotification called 3 times', () => {
     const onNewNotification = jest.fn();
     const onNewPackageActivated = jest.fn();
 
@@ -272,9 +304,9 @@ describe('useNotificationStream — onNewPackageActivated filter (task 5.5)', ()
     );
 
     act(() => {
-      latestEs().simulateMessage(makeNotification('PACKAGE_ACTIVATED', 'n-4'));
-      latestEs().simulateMessage(makeNotification('BOOKING_CONFIRMED', 'n-5'));
-      latestEs().simulateMessage(makeNotification('WAITLIST_SPOT_AVAILABLE', 'n-6'));
+      latestSocket().simulateEvent('notification', makeNotification('PACKAGE_ACTIVATED', 'n-4'));
+      latestSocket().simulateEvent('notification', makeNotification('BOOKING_CONFIRMED', 'n-5'));
+      latestSocket().simulateEvent('notification', makeNotification('WAITLIST_SPOT_AVAILABLE', 'n-6'));
     });
 
     expect(onNewPackageActivated).toHaveBeenCalledTimes(1);
@@ -282,9 +314,9 @@ describe('useNotificationStream — onNewPackageActivated filter (task 5.5)', ()
   });
 });
 
-// ─── 5.6 Deduplication via seenIds ───────────────────────────────────────────
+// ─── Deduplication via seenIds ───────────────────────────────────────────────
 
-describe('useNotificationStream — deduplication (task 5.6)', () => {
+describe('useNotificationStream -- deduplication (task 7.3)', () => {
   const makeNotification = (id: string, type = 'PACKAGE_ACTIVATED') => ({
     id,
     type,
@@ -294,7 +326,7 @@ describe('useNotificationStream — deduplication (task 5.6)', () => {
     readAt: null,
   });
 
-  it('calls onNewNotification exactly once when the same event id is dispatched twice', () => {
+  it('calls onNewNotification exactly once when the same event id is received twice', () => {
     const onNewNotification = jest.fn();
 
     renderHook(() =>
@@ -304,8 +336,8 @@ describe('useNotificationStream — deduplication (task 5.6)', () => {
     const payload = makeNotification('dedup-id-1');
 
     act(() => {
-      latestEs().simulateMessage(payload);
-      latestEs().simulateMessage(payload); // same id second time
+      latestSocket().simulateEvent('notification', payload);
+      latestSocket().simulateEvent('notification', payload); // same id second time
     });
 
     expect(onNewNotification).toHaveBeenCalledTimes(1);
@@ -319,8 +351,8 @@ describe('useNotificationStream — deduplication (task 5.6)', () => {
     );
 
     act(() => {
-      latestEs().simulateMessage(makeNotification('unique-id-1'));
-      latestEs().simulateMessage(makeNotification('unique-id-2'));
+      latestSocket().simulateEvent('notification', makeNotification('unique-id-1'));
+      latestSocket().simulateEvent('notification', makeNotification('unique-id-2'));
     });
 
     expect(onNewNotification).toHaveBeenCalledTimes(2);
@@ -337,60 +369,121 @@ describe('useNotificationStream — deduplication (task 5.6)', () => {
     const payload = makeNotification('dedup-pkg-1', 'PACKAGE_ACTIVATED');
 
     act(() => {
-      latestEs().simulateMessage(payload);
-      latestEs().simulateMessage(payload); // duplicate
+      latestSocket().simulateEvent('notification', payload);
+      latestSocket().simulateEvent('notification', payload); // duplicate
     });
 
     expect(onNewNotification).toHaveBeenCalledTimes(1);
     expect(onNewPackageActivated).toHaveBeenCalledTimes(1);
   });
+});
 
-  it('skips heartbeat ": ping" frames without calling onNewNotification', () => {
+// ─── connect_error and wsAvailable fallback ──────────────────────────────────
+
+describe('useNotificationStream -- connect_error fallback (task 7.3)', () => {
+  it('wsAvailable becomes false after more than 3 consecutive connect_error events', () => {
     const onNewNotification = jest.fn();
 
-    renderHook(() =>
+    const { result } = renderHook(() =>
       useNotificationStream({ onNewNotification }),
     );
 
-    act(() => {
-      latestEs().simulateMessage(': ping');
-    });
+    expect(result.current.wsAvailable).toBe(true);
 
-    expect(onNewNotification).not.toHaveBeenCalled();
+    // Simulate 4 consecutive connect_error events (hook disconnects after > 3)
+    act(() => {
+      latestSocket().simulateEvent('connect_error');
+    });
+    expect(result.current.wsAvailable).toBe(true);
+
+    act(() => {
+      latestSocket().simulateEvent('connect_error');
+    });
+    expect(result.current.wsAvailable).toBe(true);
+
+    act(() => {
+      latestSocket().simulateEvent('connect_error');
+    });
+    expect(result.current.wsAvailable).toBe(true);
+
+    // 4th error: failCount > 3 => wsAvailable = false
+    act(() => {
+      latestSocket().simulateEvent('connect_error');
+    });
+    expect(result.current.wsAvailable).toBe(false);
   });
 
-  it('skips events with invalid JSON without calling onNewNotification', () => {
-    const onNewNotification = jest.fn();
-
-    renderHook(() =>
-      useNotificationStream({ onNewNotification }),
+  it('disconnects the socket after wsAvailable becomes false', () => {
+    const { result } = renderHook(() =>
+      useNotificationStream({ onNewNotification: jest.fn() }),
     );
 
+    const socket = latestSocket();
+
+    // Fire 4 connect_error events
+    for (let i = 0; i < 4; i++) {
+      act(() => {
+        socket.simulateEvent('connect_error');
+      });
+    }
+
+    expect(result.current.wsAvailable).toBe(false);
+    expect(socket.disconnect).toHaveBeenCalled();
+  });
+
+  it('resets fail count on a successful connect, so subsequent errors start fresh', () => {
+    const { result } = renderHook(() =>
+      useNotificationStream({ onNewNotification: jest.fn() }),
+    );
+
+    // 2 errors
     act(() => {
-      // simulateMessage with a raw string — not JSON
-      latestEs().onmessage?.(new MessageEvent('message', { data: 'not-valid-json{' }));
+      latestSocket().simulateEvent('connect_error');
+      latestSocket().simulateEvent('connect_error');
     });
 
-    expect(onNewNotification).not.toHaveBeenCalled();
+    // Successful connect resets counter
+    act(() => {
+      latestSocket().simulateEvent('connect');
+    });
+
+    expect(result.current.connected).toBe(true);
+    expect(result.current.wsAvailable).toBe(true);
+
+    // 3 more errors (total after reset: 3)
+    act(() => {
+      latestSocket().simulateEvent('connect_error');
+      latestSocket().simulateEvent('connect_error');
+      latestSocket().simulateEvent('connect_error');
+    });
+
+    // Still true — need > 3
+    expect(result.current.wsAvailable).toBe(true);
+
+    // 4th error after reset
+    act(() => {
+      latestSocket().simulateEvent('connect_error');
+    });
+    expect(result.current.wsAvailable).toBe(false);
   });
 });
 
-// ─── General: enabled flag ────────────────────────────────────────────────────
+// ─── enabled flag ────────────────────────────────────────────────────────────
 
-describe('useNotificationStream — enabled guard', () => {
-  it('does not create an EventSource when enabled is false', () => {
+describe('useNotificationStream -- enabled guard (task 7.3)', () => {
+  it('does not create a socket when enabled is false', () => {
     renderHook(() =>
       useNotificationStream({ onNewNotification: jest.fn(), enabled: false }),
     );
 
-    expect(MockEventSource.instances).toHaveLength(0);
+    expect(mockIo).not.toHaveBeenCalled();
   });
 
-  it('creates an EventSource when enabled is true (default)', () => {
+  it('creates a socket when enabled is true (default)', () => {
     renderHook(() =>
       useNotificationStream({ onNewNotification: jest.fn() }),
     );
 
-    expect(MockEventSource.instances).toHaveLength(1);
+    expect(mockIo).toHaveBeenCalledTimes(1);
   });
 });

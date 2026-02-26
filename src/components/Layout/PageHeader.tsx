@@ -25,10 +25,10 @@ export function PageHeader({
   const { isAuthenticated } = useAuth();
   const { notifications, markAsRead, markAllAsRead, dismiss, addNotification } = useNotifications();
 
-  // Open SSE stream for real-time notification delivery.
+  // Open WebSocket stream for real-time notification delivery.
   // PageHeader owns the bell state — it manages addNotification.
   // onNewPackageActivated fires a CustomEvent so any mounted page (e.g. dashboard)
-  // can react without opening a second SSE connection.
+  // can react without opening a second WebSocket connection.
   useNotificationStream({
     onNewNotification: addNotification,
     onNewPackageActivated: () => {

@@ -158,8 +158,8 @@ export default function DashboardPage() {
     }, []),
   });
 
-  // Real-time path: PageHeader's SSE hook dispatches this event on PACKAGE_ACTIVATED.
-  // Only one SSE connection is opened (by PageHeader); dashboard reacts here without
+  // Real-time path: PageHeader's WebSocket hook dispatches this event on PACKAGE_ACTIVATED.
+  // Only one WebSocket connection is opened (by PageHeader); dashboard reacts here without
   // opening a second connection.
   useEffect(() => {
     const handler = () => {

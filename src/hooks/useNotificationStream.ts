@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
+import { WS_NOTIFICATION_EVENT, WsNotificationPayload } from '@spinbooking/types';
 import { Notification } from './useNotifications';
 
 interface UseNotificationStreamOptions {
@@ -8,8 +10,8 @@ interface UseNotificationStreamOptions {
 }
 
 interface UseNotificationStreamResult {
-  connected: boolean;    // true when EventSource.readyState === OPEN
-  sseAvailable: boolean; // false after 3 consecutive failures (polling-only mode)
+  connected: boolean;    // true when Socket.IO connection is active
+  wsAvailable: boolean;  // false after max consecutive failures (polling-only mode)
 }
 
 export function useNotificationStream(
@@ -18,14 +20,13 @@ export function useNotificationStream(
   const { onNewNotification, onNewPackageActivated, enabled = true } = options;
 
   const [connected, setConnected] = useState(false);
-  const [sseAvailable, setSseAvailable] = useState(true);
+  const [wsAvailable, setWsAvailable] = useState(true);
 
-  const esRef = useRef<EventSource | null>(null);
-  const retryCountRef = useRef(0);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const seenIds = useRef<Set<string>>(new Set());
+  const failCountRef = useRef(0);
 
-  // Keep latest callbacks in a ref to avoid stale closures in EventSource handlers
+  // Keep latest callbacks in a ref to avoid stale closures in Socket.IO handlers
   const onNewNotificationRef = useRef(onNewNotification);
   const onNewPackageActivatedRef = useRef(onNewPackageActivated);
   useEffect(() => {
@@ -41,89 +42,76 @@ export function useNotificationStream(
     // Guard against disabled / unauthenticated
     if (!enabled) return;
     // Guard: don't reconnect if we've exhausted retries
-    if (!sseAvailable) return;
+    if (!wsAvailable) return;
 
-    const connect = () => {
-      const token = localStorage.getItem('accessToken');
-      if (!token) return;
+    const token = localStorage.getItem('accessToken');
+    if (!token) return;
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-      const url = `${apiUrl}/notifications/stream?token=${encodeURIComponent(token)}`;
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-      const es = new EventSource(url);
-      esRef.current = es;
+    const socket = io(`${apiUrl}/notifications`, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 3,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+    });
+    socketRef.current = socket;
 
-      es.onopen = () => {
-        retryCountRef.current = 0;
-        setConnected(true);
-        setSseAvailable(true);
-      };
+    socket.on('connect', () => {
+      failCountRef.current = 0;
+      setConnected(true);
+      setWsAvailable(true);
+    });
 
-      es.onmessage = (event: MessageEvent) => {
-        // Heartbeat comment frames arrive as empty data — skip them
-        if (!event.data || event.data === ': ping') return;
+    socket.on(WS_NOTIFICATION_EVENT, (data: WsNotificationPayload) => {
+      // Deduplication: drop if we've already processed this notification ID
+      if (seenIds.current.has(data.id)) return;
+      seenIds.current.add(data.id);
 
-        let parsed: Notification;
-        try {
-          parsed = JSON.parse(event.data) as Notification;
-        } catch {
-          return;
+      onNewNotificationRef.current(data);
+
+      if (data.type === 'PACKAGE_ACTIVATED') {
+        onNewPackageActivatedRef.current?.();
+
+        const newCredits = data.data?.newCredits;
+        if (typeof newCredits === 'number') {
+          window.dispatchEvent(
+            new CustomEvent('spinbooking:credits-updated', { detail: { delta: newCredits } }),
+          );
         }
+      }
+    });
 
-        // Deduplication: drop if we've already processed this notification ID
-        if (seenIds.current.has(parsed.id)) return;
-        seenIds.current.add(parsed.id);
+    socket.on('disconnect', () => {
+      setConnected(false);
+    });
 
-        onNewNotificationRef.current(parsed);
+    socket.on('connect_error', () => {
+      failCountRef.current += 1;
+      if (failCountRef.current > 3) {
+        setWsAvailable(false);
+        socket.disconnect();
+      }
+    });
 
-        if (parsed.type === 'PACKAGE_ACTIVATED') {
-          onNewPackageActivatedRef.current?.();
-
-          const newCredits = parsed.data?.newCredits;
-          if (typeof newCredits === 'number') {
-            window.dispatchEvent(
-              new CustomEvent('spinbooking:credits-updated', { detail: { delta: newCredits } }),
-            );
-          }
-        }
-      };
-
-      es.onerror = () => {
-        es.close();
-        esRef.current = null;
-        setConnected(false);
-
-        retryCountRef.current += 1;
-
-        if (retryCountRef.current <= 3) {
-          // Exponential backoff: 1s, 2s, 4s
-          const delay = Math.pow(2, retryCountRef.current - 1) * 1000;
-          reconnectTimerRef.current = setTimeout(() => {
-            connect();
-          }, delay);
-        } else {
-          // After 3 consecutive failures, switch to polling-only mode
-          setSseAvailable(false);
-        }
-      };
-    };
-
-    connect();
+    // Refresh token on reconnection attempt in case the original JWT expired
+    socket.io.on('reconnect_attempt', () => {
+      const freshToken = localStorage.getItem('accessToken');
+      if (freshToken) {
+        socket.auth = { token: freshToken };
+      }
+    });
 
     return () => {
-      // Cleanup on unmount or when enabled/sseAvailable changes
-      if (reconnectTimerRef.current !== null) {
-        clearTimeout(reconnectTimerRef.current);
-        reconnectTimerRef.current = null;
-      }
-      if (esRef.current) {
-        esRef.current.close();
-        esRef.current = null;
-      }
+      // Cleanup on unmount or when enabled/wsAvailable changes
+      socket.disconnect();
+      socketRef.current = null;
       setConnected(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, sseAvailable]);
+  }, [enabled, wsAvailable]);
 
-  return { connected, sseAvailable };
+  return { connected, wsAvailable };
 }

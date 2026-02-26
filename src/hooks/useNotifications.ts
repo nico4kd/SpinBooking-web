@@ -124,7 +124,7 @@ export function useNotifications(options: UseNotificationsOptions = {}) {
     return () => clearInterval(interval);
   }, [pollingInterval, fetchNotifications]);
 
-  // Optimistically prepend an SSE-received notification to local state.
+  // Optimistically prepend a real-time notification to local state.
   // Called by useNotificationStream via the onNewNotification callback.
   const addNotification = useCallback((notification: Notification) => {
     setNotifications((prev) => [notification, ...prev]);
