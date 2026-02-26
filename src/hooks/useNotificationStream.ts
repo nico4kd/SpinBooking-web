@@ -78,6 +78,13 @@ export function useNotificationStream(
 
         if (parsed.type === 'PACKAGE_ACTIVATED') {
           onNewPackageActivatedRef.current?.();
+
+          const newCredits = parsed.data?.newCredits;
+          if (typeof newCredits === 'number') {
+            window.dispatchEvent(
+              new CustomEvent('spinbooking:credits-updated', { detail: { delta: newCredits } }),
+            );
+          }
         }
       };
 

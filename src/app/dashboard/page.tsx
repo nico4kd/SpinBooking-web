@@ -171,6 +171,17 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { delta } = (e as CustomEvent<{ delta: number }>).detail;
+      setStats((prev) =>
+        prev ? { ...prev, availableCredits: prev.availableCredits + delta } : prev,
+      );
+    };
+    window.addEventListener('spinbooking:credits-updated', handler);
+    return () => window.removeEventListener('spinbooking:credits-updated', handler);
+  }, []);
+
   const loadStats = async () => {
     try {
       setStatsLoading(true);
