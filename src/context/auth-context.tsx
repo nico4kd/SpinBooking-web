@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('refreshToken', refreshToken);
       setUser(userData);
 
-      router.push('/dashboard');
+      router.push(userData.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard');
     } catch (error) {
       if (error instanceof AxiosError) {
         throw new Error(error.response?.data?.message || 'Login failed');

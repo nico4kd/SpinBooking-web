@@ -12,6 +12,7 @@ import {
   AdminLayout,
   AdminPageHeader,
   ConsoleMetric,
+  PendingPaymentsCard,
 } from '../../../components/admin';
 import {
   Users,
@@ -182,6 +183,9 @@ export default function AdminDashboardPage() {
             />
           </div>
         )}
+
+          {/* Pending Payments */}
+          <PendingPaymentsCard />
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
