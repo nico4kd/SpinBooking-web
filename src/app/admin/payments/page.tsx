@@ -6,7 +6,7 @@ import api from '../../../lib/api-client';
 import { getPaymentStatusBadge as getPaymentStatusBadgeShared } from '../../../lib/utils/status-badges';
 import { PaymentStatus, PaymentMethod } from '@spinbooking/types';
 import { Card, Button, Badge, DatePicker, Select } from '../../../components/ui';
-import { AdminLayout, AdminPageHeader } from '../../../components/admin';
+import { AdminLayout, AdminPageHeader, ManualPaymentModal } from '../../../components/admin';
 import {
   Filter,
   CreditCard,
@@ -111,6 +111,7 @@ export default function AdminPaymentsPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   // UI state
+  const [showNewManualPaymentModal, setShowNewManualPaymentModal] = useState(false);
   const [showManualPaymentForm, setShowManualPaymentForm] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<'IN_PERSON_CASH' | 'IN_PERSON_CARD'>('IN_PERSON_CASH');
@@ -422,14 +423,21 @@ export default function AdminPaymentsPage() {
       />
 
       {/* Header Actions */}
-      <div className="h-16 border-b border-[hsl(var(--border-default))] flex items-center justify-end pl-16 pr-4 sm:px-6 lg:px-8 bg-[hsl(var(--surface-0))]">
+      <div className="h-16 border-b border-[hsl(var(--border-default))] flex items-center justify-end gap-2 pl-16 pr-4 sm:px-6 lg:px-8 bg-[hsl(var(--surface-0))]">
         <Button
           variant="primary"
           size="sm"
-          onClick={() => setShowManualPaymentForm(!showManualPaymentForm)}
+          onClick={() => setShowNewManualPaymentModal(true)}
         >
           <Plus className="w-4 h-4 mr-2" />
-          {showManualPaymentForm ? 'Ocultar' : 'Registrar'} Pago Manual
+          Nuevo Pago Manual
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowManualPaymentForm(!showManualPaymentForm)}
+        >
+          {showManualPaymentForm ? 'Ocultar' : 'Registrar'} Pago Existente
         </Button>
       </div>
 
@@ -1259,6 +1267,15 @@ export default function AdminPaymentsPage() {
           </Card>
         </div>
       )}
+
+      <ManualPaymentModal
+        open={showNewManualPaymentModal}
+        onClose={() => setShowNewManualPaymentModal(false)}
+        onSuccess={() => {
+          loadPayments();
+          loadPendingPackages();
+        }}
+      />
     </>
   );
 }

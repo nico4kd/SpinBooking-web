@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/auth-context';
 import api from '../../lib/api-client';
 import { Card, Button } from '../ui';
-import { Clock, CheckCircle, RefreshCw, X, Banknote, Building2, AlertCircle } from 'lucide-react';
+import { Clock, CheckCircle, RefreshCw, X, Banknote, Building2, AlertCircle, Plus } from 'lucide-react';
 import { formatCurrency } from '@spinbooking/utils';
 import { toast } from '../../lib/toast';
+import { ManualPaymentModal } from './ManualPaymentModal';
 
 interface PendingManualPaymentData {
   paymentId: string;
@@ -76,6 +77,8 @@ export function PendingPaymentsCard() {
   const [pendingManualPayments, setPendingManualPayments] = useState<PendingManualPaymentData[]>([]);
   const [loadingPending, setLoadingPending] = useState(true);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
+
+  const [showManualPaymentModal, setShowManualPaymentModal] = useState(false);
 
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [selectedPendingPayment, setSelectedPendingPayment] = useState<PendingManualPaymentData | null>(null);
@@ -163,11 +166,21 @@ export function PendingPaymentsCard() {
                 Transferencias y pagos en efectivo que requieren acción del administrador
               </p>
             </div>
-            {pendingManualPayments.length > 0 && (
-              <span className="ml-auto px-2 py-0.5 rounded-full bg-[hsl(var(--warning)/0.15)] text-[hsl(var(--warning))] text-xs font-bold">
-                {pendingManualPayments.length}
-              </span>
-            )}
+            <div className="ml-auto flex items-center gap-2">
+              {pendingManualPayments.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-[hsl(var(--warning)/0.15)] text-[hsl(var(--warning))] text-xs font-bold">
+                  {pendingManualPayments.length}
+                </span>
+              )}
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => setShowManualPaymentModal(true)}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Pago Manual
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -398,6 +411,12 @@ export function PendingPaymentsCard() {
           </Card>
         </div>
       )}
+
+      <ManualPaymentModal
+        open={showManualPaymentModal}
+        onClose={() => setShowManualPaymentModal(false)}
+        onSuccess={() => loadPendingManualPayments()}
+      />
     </>
   );
 }
